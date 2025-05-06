@@ -1,4 +1,5 @@
 
+
 // src-tauri/src/main.rs
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -61,9 +62,10 @@ fn main() {
             scanner::scan_code_context_builder_profile,
             scanner::cancel_code_context_builder_scan,
             scanner::read_file_contents,
+            scanner::read_multiple_file_contents, // Added new command
             utils::get_text_token_count,
-            file_monitor::start_monitoring_profile_cmd, // Added command
-            file_monitor::stop_monitoring_profile_cmd   // Added command
+            file_monitor::start_monitoring_profile_cmd,
+            file_monitor::stop_monitoring_profile_cmd
         ])
         .run(context)
         .expect("error while running tauri application");

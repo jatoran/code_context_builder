@@ -1,3 +1,4 @@
+
 // src-tauri/src/scanner.rs
 // Main scan command orchestration, progress emission, cache interaction.
 
@@ -13,6 +14,7 @@ use crate::scan_tree::{build_tree_from_paths, file_modified_timestamp, gather_va
 
 use rayon::prelude::*; // For parallel iteration
 // REMOVED: use std::collections::HashSet; // No longer needed for allow filter
+use std::collections::HashMap; // Added for read_multiple_file_contents
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -42,6 +44,34 @@ pub fn read_file_contents(file_path: String) -> Result<String, String> {
         return Err(format!("Path is a directory, not a file: {}", file_path));
     }
     fs::read_to_string(path).map_err(|e| format!("Failed to read file '{}': {}", file_path, e))
+}
+
+// --- NEW Command to Read Multiple File Contents ---
+#[command]
+pub fn read_multiple_file_contents(
+    paths: Vec<String>,
+) -> Result<HashMap<String, Result<String, String>>, String> {
+    println!("[CMD] Reading {} files batch.", paths.len());
+    let results: HashMap<String, Result<String, String>> = paths
+        .par_iter() // Process paths in parallel
+        .map(|path_str| {
+            let path = Path::new(path_str);
+            let content_result = if !path.exists() {
+                Err(format!("File does not exist: {}", path_str))
+            } else if path.is_dir() {
+                Err(format!("Path is a directory, not a file: {}", path_str))
+            } else {
+                // Consider MAX_FILE_SIZE_BYTES for batch read as well if necessary,
+                // though frontend might pre-filter based on FileNode.size
+                // For simplicity, this example doesn't re-check size here, assuming
+                // paths provided are for files intended for aggregation.
+                fs::read_to_string(path)
+                    .map_err(|e| format!("Failed to read file '{}': {}", path_str, e))
+            };
+            (path_str.clone(), content_result)
+        })
+        .collect();
+    Ok(results)
 }
 
 

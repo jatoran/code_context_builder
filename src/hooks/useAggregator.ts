@@ -1,5 +1,6 @@
 
 
+
 // src/hooks/useAggregator.ts
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -24,6 +25,12 @@ interface UseAggregatorProps {
     selectedPaths: Set<string>;
     selectedProfileId: number | null;
 }
+
+// Type for the result of a single file read in the batch response
+type FileContentResult = { Ok: string } | { Err: string };
+// Type for the overall batch file contents response from Tauri
+type BatchFileContentsResponse = Record<string, FileContentResult>;
+
 
 interface UseAggregatorReturn {
     aggregatedText: string;
@@ -57,6 +64,29 @@ function getRelativePath(fullPath: string, rootPath: string): string {
     }
     return fullPath; // Fallback, though should ideally always be relative
 }
+
+// New helper to collect all unique file paths that need content
+const collectFilePathsForAggregation = (
+    node: FileNode | null,
+    selectedPaths: Set<string>,
+    pathsSet: Set<string> // Use a Set to ensure uniqueness
+): void => {
+    if (!node) return;
+
+    if (!node.is_dir && selectedPaths.has(node.path)) {
+        pathsSet.add(node.path);
+    }
+
+    if (node.is_dir && node.children) {
+        // Only recurse into directories if they are relevant (contain selected files or subdirs)
+        // or if the directory itself is somehow marked as "selected for aggregation" (not currently a feature, but for completeness)
+        if (isDirRelevantForAggregation(node, selectedPaths)) {
+            for (const child of node.children) {
+                collectFilePathsForAggregation(child, selectedPaths, pathsSet);
+            }
+        }
+    }
+};
 
 
 export function useAggregator({ treeData, selectedPaths, selectedProfileId }: UseAggregatorProps): UseAggregatorReturn {
@@ -116,7 +146,8 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
         currentNode: FileNode,
         currentMarkDownDepth: number,
         formatToUse: OutputFormat,
-        profileRootPath: string // Added profileRootPath
+        profileRootPath: string,
+        fileContentsMap: BatchFileContentsResponse // Pass the map of fetched contents
     ): Promise<string> => {
         let builtContent = "";
     
@@ -137,25 +168,32 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
             const displayPath = getRelativePath(childNode.path, profileRootPath);
 
             if (!childNode.is_dir) {
-                try {
-                    const fileContent = await invoke<string>("read_file_contents", { filePath: childNode.path });
-                    const lang = getLanguageFromPath(childNode.path);
-                    // Pass displayPath (relative) to formatFileContent
-                    builtContent += formatFileContent(displayPath, childNode.name, fileContent, formatToUse, currentMarkDownDepth, lang);
-                } catch (e) {
-                    const lang = getLanguageFromPath(childNode.path);
-                    const errorMsg = e instanceof Error ? e.message : String(e);
-                    builtContent += formatFileContent(displayPath, childNode.name, `// Error reading file: ${errorMsg}`, formatToUse, currentMarkDownDepth, lang);
+                const lang = getLanguageFromPath(childNode.path);
+                const fileResult = fileContentsMap[childNode.path];
+                let fileContentText: string;
+
+                if (fileResult) {
+                    if ('Ok' in fileResult) {
+                        fileContentText = fileResult.Ok;
+                    } else { // 'Err' in fileResult
+                        fileContentText = `// Error reading file (${childNode.name}): ${fileResult.Err}`;
+                        console.warn(`Error fetching content for ${childNode.path}: ${fileResult.Err}`);
+                    }
+                } else {
+                    fileContentText = `// Error: Content for ${childNode.name} not found in batch response.`;
+                    console.warn(`Content for ${childNode.path} was expected but not found in batch response.`);
                 }
-            } else {
-                // Pass displayPath (relative) to formatFolderHeader
+                builtContent += formatFileContent(displayPath, childNode.name, fileContentText, formatToUse, currentMarkDownDepth, lang);
+
+            } else { // Directory
                 builtContent += formatFolderHeader(childNode.name, displayPath, formatToUse, currentMarkDownDepth);
-                builtContent += await buildAggregatedContentRecursive(childNode, currentMarkDownDepth + 1, formatToUse, profileRootPath);
+                // Recursive call, passing down the map
+                builtContent += await buildAggregatedContentRecursive(childNode, currentMarkDownDepth + 1, formatToUse, profileRootPath, fileContentsMap);
                 builtContent += formatFolderFooter(formatToUse, currentMarkDownDepth);
             }
         }
         return builtContent;
-    }, [selectedPaths]);
+    }, [selectedPaths]); // selectedPaths dependency is still relevant for filtering `relevantChildren`
 
     const generateAggregatedText = useCallback(async () => {
         setIsLoading(true);
@@ -163,6 +201,7 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
         setCopySuccess(false);
         let textForPrependedTree = '';
         let aggregatedCoreContent = '';
+        let fileContentsMap: BatchFileContentsResponse = {};
 
         if (!treeData) {
             setAggregatedText('');
@@ -173,38 +212,63 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
 
         const formatToUse = currentSelectedFormat;
         const prependToUse = currentPrependFileTree;
-        const profileRootAbsolutePath = treeData.path; // Absolute path of the profile's root
+        const profileRootAbsolutePath = treeData.path; 
 
         if (prependToUse) {
             textForPrependedTree = generateFullScannedFileTree(treeData, formatToUse);
         }
 
+        // 1. Collect all file paths to fetch
+        const pathsToFetchSet = new Set<string>();
+        if (selectedPaths.size > 0) {
+             collectFilePathsForAggregation(treeData, selectedPaths, pathsToFetchSet);
+        }
+        const uniquePathsToFetch = Array.from(pathsToFetchSet);
+
+        // 2. Fetch contents in batch if there are paths
+        if (uniquePathsToFetch.length > 0) {
+            try {
+                console.log(`[Aggregator] Fetching content for ${uniquePathsToFetch.length} files in batch.`);
+                fileContentsMap = await invoke<BatchFileContentsResponse>("read_multiple_file_contents", { paths: uniquePathsToFetch });
+            } catch (batchError) {
+                const errMsg = batchError instanceof Error ? batchError.message : String(batchError);
+                console.error("Error invoking read_multiple_file_contents:", errMsg);
+                setError(`Failed to fetch file contents: ${errMsg}`);
+                // Populate map with errors for all paths attempted
+                uniquePathsToFetch.forEach(p => {
+                    if (!fileContentsMap[p]) { // Avoid overwriting if some partial results came back before a general invoke error
+                        fileContentsMap[p] = { Err: `Batch read command failed: ${errMsg}` };
+                    }
+                });
+            }
+        }
+
+        // 3. Build the aggregated content using the fetched map
         if (selectedPaths.size > 0) {
             if (treeData.is_dir) {
                 let rootLevelDepth = 1;
-                // For the root display path, use its name (e.g., "my_project/")
-                // The full path from OS root is profileRootAbsolutePath
                 const rootDisplayPath = treeData.name.endsWith('/') ? treeData.name : `${treeData.name}/`;
 
                 if (isDirRelevantForAggregation(treeData, selectedPaths)) {
                     aggregatedCoreContent += formatFolderHeader(treeData.name, rootDisplayPath, formatToUse, rootLevelDepth);
-                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth + 1, formatToUse, profileRootAbsolutePath);
+                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth + 1, formatToUse, profileRootAbsolutePath, fileContentsMap);
                     aggregatedCoreContent += formatFolderFooter(formatToUse, rootLevelDepth);
                 } else {
-                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth, formatToUse, profileRootAbsolutePath);
+                    // This case might imply treeData itself is not a relevant container but its children might be (if treeData is root)
+                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth, formatToUse, profileRootAbsolutePath, fileContentsMap);
                 }
 
             } else if (selectedPaths.has(treeData.path)) { // Root is a single selected file
-                try {
-                    const fileContent = await invoke<string>("read_file_contents", { filePath: treeData.path });
-                    const lang = getLanguageFromPath(treeData.path);
-                    // For a single root file, its display path is its name
-                    aggregatedCoreContent += formatFileContent(treeData.name, treeData.name, fileContent, formatToUse, 1, lang);
-                } catch (e) {
-                    const lang = getLanguageFromPath(treeData.path);
-                    const errorMsg = e instanceof Error ? e.message : String(e);
-                    aggregatedCoreContent += formatFileContent(treeData.name, treeData.name, `// Error reading file: ${errorMsg}`, formatToUse, 1, lang);
+                const lang = getLanguageFromPath(treeData.path);
+                const fileResult = fileContentsMap[treeData.path];
+                let fileContentText: string;
+                if (fileResult) {
+                    if ('Ok' in fileResult) fileContentText = fileResult.Ok;
+                    else fileContentText = `// Error reading file (${treeData.name}): ${fileResult.Err}`;
+                } else {
+                     fileContentText = `// Error: Content for ${treeData.name} not found in batch response (root file).`;
                 }
+                aggregatedCoreContent += formatFileContent(treeData.name, treeData.name, fileContentText, formatToUse, 1, lang);
             }
         }
         
@@ -223,8 +287,6 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
         } else if (formatToUse === 'xml' && finalOutput.length > 0 && !finalOutput.endsWith('\n')) {
             finalOutput += '\n';
         }
-        // For 'raw' format, each file content from formatFileContent already ends with a single '\n'.
-        // No specific trailing character cleanup needed for raw format here.
 
         setAggregatedText(finalOutput);
 
@@ -247,7 +309,7 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
 
     useEffect(() => {
         generateAggregatedText();
-    }, [generateAggregatedText]);
+    }, [generateAggregatedText]); // generateAggregatedText itself depends on selectedPaths, treeData, etc.
 
     const handleCopyToClipboard = useCallback(async () => {
         if (!aggregatedText || isLoading) return;

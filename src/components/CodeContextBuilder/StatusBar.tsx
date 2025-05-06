@@ -49,6 +49,7 @@ const StatusBar: React.FC<StatusBarProps> = ({ stats, lastScanTime, outOfDateFil
         // Use CSS class from App.css (PDK style)
         <div className="status-bar">
             <div className="status-bar-left">
+                Project Stats:
                 {/* Display stats with color coding spans if desired */}
                 {stats.files > 0 && <span className="stat-files">Files: {stats.files.toLocaleString()}</span>}
                 {stats.folders > 0 && <span className="stat-folders">Folders: {stats.folders.toLocaleString()}</span>}
