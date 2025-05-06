@@ -1,0 +1,782 @@
+
+:root {
+  /* Basic theme variables */
+  --bg-color: #1e1e1e;
+  --text-color: #ffffff;
+  --accent-color: #396cd8;
+  --active-tab-bg-color: #4a7ed0; /* New active tab background color */
+  --active-tab-border-color: #4a7ed0; /* New active tab border color */
+  --border-color: #3a3a3a;
+  --card-bg-color: #2b2b2b;
+  --card-bg-color2: #272727;
+  --danger-color: #f66;
+  --transition-speed: 0.3s;
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  color-scheme: dark;
+  --sidebar-bg-color: #112832;
+
+  /* Added from Standalone App CSS for compatibility */
+  --background-color: var(--bg-color); /* Map to PDK var */
+  --background-secondary-color: #1e1e1e; /* Darker for code areas */
+  --background-tertiary-color: #2d2d2d; /* Darker for modals */
+  --background-accent-color: #2b2b2b; /* Similar to card-bg */
+  --border-secondary-color: #444; /* Slightly lighter border */
+  --link-hover-color: #646cff; /* Keep standalone link hover */
+  --input-background-color: #333;
+  --input-text-color: #eee;
+  --label-text-color: #ccc;
+  --disabled-opacity: 0.5;
+  --highlight-background-color: #695112; /* PDK Style Search Highlight */
+  --highlight-text-color: #eee; /* PDK Style Search Highlight Text */
+  --overlay-background-color: rgba(0, 0, 0, 0.7);
+  --modal-shadow-color: rgba(0, 0, 0, 0.3);
+}
+
+
+/* Universal Scrollbar Styling */
+/* Firefox */
+* {
+  scrollbar-width: thin; /* Makes the scrollbar slimmer */
+  scrollbar-color: #8470FF var(--bg-color); /* Thumb: light slate blue, Track: background color */
+}
+/* WebKit Browsers (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background-color: var(--bg-color); /* Using your background color for consistency */
+}
+::-webkit-scrollbar-thumb {
+  background-color: #8470FF; /* Light slate blue */
+  border-radius: 4px; /* Rounded corners for a sleeker look */
+  border: 2px solid var(--bg-color); /* Optional: adds spacing between thumb and track */
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: #935EFF; /* Slightly lighter blue on hover */
+}
+
+
+/* Make the root fill the screen */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden; /* Prevent vertical scroll on the entire UI */
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif; /* Ensure font is set */
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ==========================================================================
+   Main Layout Structure (Adapted for Standalone)
+   ========================================================================== */
+.app-container {
+  display: flex;
+  flex-direction: column; /* Stack main layout and status bar vertically */
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--background-color);
+}
+
+/* Wrapper for Sidebar + Main Content Area */
+.main-layout {
+    display: flex;
+    flex-grow: 1; /* Takes up space above status bar */
+    overflow: hidden;
+}
+
+/* Left Sidebar Area */
+.sidebar {
+  width: 350px; /* Adjust as needed */
+  min-width: 300px;
+  border-right: 1px solid var(--border-color);
+  padding: 1em;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Full height within main-layout */
+  box-sizing: border-box;
+  flex-shrink: 0;
+  background-color: var(--sidebar-bg-color); /* PDK Sidebar color */
+}
+
+/* Right Area (Splits into File Tree and Aggregator/Other Views) */
+.main-content-split {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+/* ==========================================================================
+   Component Styles
+   ========================================================================== */
+
+/* --- Headings --- */
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 0;
+  margin-bottom: 0.5em;
+  font-weight: 500;
+}
+
+/* --- Buttons --- */
+button {
+  cursor: pointer;
+  background-color: var(--card-bg-color); /* PDK button style */
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 1rem; /* PDK padding */
+  border-radius: 6px; /* PDK radius */
+  transition: background-color var(--transition-speed), border-color var(--transition-speed);
+  margin: 0 4px; /* Default spacing */
+}
+button:hover {
+  background-color: var(--accent-color); /* PDK hover */
+  border-color: var(--accent-color);
+}
+button:focus, button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+button:active {
+  opacity: 0.8;
+}
+button:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+  background-color: #333; /* Dimmer background when disabled */
+  border-color: #444;
+}
+button.delete-btn { /* PDK delete style */
+  background-color: var(--danger-color);
+  border-color: var(--danger-color);
+}
+button.delete-btn:hover {
+  background-color: #d55;
+  border-color: #d55;
+}
+
+/* --- Inputs, Select, Textarea --- */
+input, select, textarea {
+    background-color: var(--input-background-color); /* Use var */
+    color: var(--input-text-color); /* Use var */
+    border: 1px solid var(--border-color);
+    padding: 0.5rem; /* Consistent padding */
+    border-radius: 4px;
+    transition: border-color var(--transition-speed);
+    margin: 2px 0;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 1em; /* Match base font size */
+}
+input:focus, select:focus, textarea:focus {
+    border-color: var(--accent-color); /* Highlight focus */
+    outline: none;
+}
+input::placeholder, textarea::placeholder {
+    color: var(--label-text-color);
+    opacity: 0.7;
+}
+textarea {
+    width: 100%;
+    resize: vertical;
+    min-height: 60px;
+    font-family: monospace; /* Use monospace for code */
+}
+
+/* --- Labels --- */
+label {
+    display: block;
+    margin-bottom: 0.2em;
+    font-size: 0.9em;
+    color: var(--label-text-color);
+}
+
+
+/* --------------------------------------------------------------------------
+   Profile Manager (in Sidebar)
+   -------------------------------------------------------------------------- */
+.profile-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+  margin-bottom: 1em; /* Space below */
+}
+.profile-manager h3 {
+    margin-bottom: 0.5em; /* Space below heading */
+}
+.profile-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em; /* Spacing between controls */
+}
+.profile-controls select {
+    flex-grow: 1;
+    min-width: 150px;
+    padding: 0.5rem; /* Match button/input padding */
+}
+.profile-controls button {
+    padding: 0.5rem 0.8rem; /* Adjust padding slightly */
+    margin: 0; /* Remove default margin */
+}
+
+/* Profile Form Styling (using PDK classes/structure) */
+.profile-form {
+  margin-top: 1em;
+  border: 1px solid var(--border-color); /* Match PDK panel style */
+  padding: 1em; /* PDK padding */
+  border-radius: 4px; /* PDK radius */
+  background-color: var(--card-bg-color2); /* Slightly different background */
+  display: flex;
+  flex-direction: column;
+  gap: 0.8em;
+}
+.form-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+.form-row label {
+    flex-basis: 150px; /* Adjust if necessary */
+    flex-shrink: 0;
+    text-align: right;
+    margin-bottom: 0; /* Override default label margin */
+    color: var(--label-text-color);
+    font-size: 0.9em;
+}
+.form-row input[type="text"],
+.form-row textarea {
+    flex-grow: 1;
+    min-width: 50px; /* Prevent shrinking too much */
+    padding: 0.5rem; /* Consistent padding */
+}
+/* Specific smaller button within form rows (e.g., browse button) */
+.form-row button.browse-button {
+     padding: 0.5rem; /* Match input height */
+     font-size: 1em;
+     flex-shrink: 0;
+     margin: 0;
+     line-height: 1; /* Align icon better */
+     background-color: var(--card-bg-color);
+     border-color: var(--border-color);
+     min-width: auto; /* Allow button to be smaller */
+ }
+.form-row button.browse-button:hover {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.form-actions {
+    margin-top: 1em;
+    text-align: right;
+}
+.form-actions button {
+    padding: 0.5rem 1rem; /* Standard button padding */
+    margin-left: 0.5em;
+}
+
+
+/* --------------------------------------------------------------------------
+   File Tree Area (Left side of main-content-split)
+   -------------------------------------------------------------------------- */
+.file-tree-container {
+    width: 50%; /* Default width */
+    min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid var(--border-secondary-color);
+    height: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
+/* Search input area */
+.search-container {
+    padding: 0.5em 1em;
+    border-bottom: 1px solid var(--border-secondary-color);
+    flex-shrink: 0;
+    display: flex; /* Added for button alignment */
+    align-items: center; /* Added */
+    gap: 0.5em; /* Added */
+}
+.search-container input {
+    flex-grow: 1; /* Take available space */
+    padding: 0.4em 0.6em;
+    margin: 0;
+}
+/* Style expand/collapse/clear buttons */
+.search-container button {
+    padding: 0.4em; /* Smaller padding */
+    font-size: 0.9em;
+    line-height: 1;
+    min-width: auto; /* Allow small buttons */
+    margin: 0;
+}
+
+/* Scrollable area for the tree itself */
+.file-tree-scroll-area {
+    flex-grow: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.5em 0 1em 0; /* Adjusted padding */
+}
+
+/* The tree list itself */
+.file-tree {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    user-select: none; /* Prevent text selection during clicks */
+}
+
+/* Individual tree node list item */
+.file-tree-node-li {
+    padding-left: 0 !important; /* Override potential default padding */
+}
+
+/* Flex container for node elements (toggle, checkbox, icon, name) */
+.file-tree-node {
+    padding: 1px 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: default;
+    padding-left: calc(var(--node-level, 0) * 20px); /* Use CSS variable for level */
+    /* Add hover effect like PDK */
+    border-radius: 3px;
+    margin: 1px 4px 1px 4px; /* Add horizontal margin */
+}
+.file-tree-node:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+/* Highlighted node (e.g., from keyboard navigation) */
+.file-tree-node.highlighted {
+    background-color: #444; /* Match PDK highlight */
+}
+
+/* Expander toggle */
+.node-toggle {
+    cursor: pointer;
+    width: 1em;
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--label-text-color); /* Dim the toggle slightly */
+    user-select: none;
+}
+.node-toggle:hover {
+    color: var(--text-color);
+}
+.node-toggle-placeholder { /* Use for files to maintain alignment */
+    display: inline-block;
+    width: 1em;
+    flex-shrink: 0;
+}
+
+/* Checkbox */
+.node-checkbox {
+    margin: 0 5px 0 0;
+    flex-shrink: 0;
+    cursor: pointer;
+    /* Style checkbox to be more visible */
+    width: 14px;
+    height: 14px;
+    accent-color: var(--accent-color); /* Color the check */
+}
+.node-checkbox-placeholder { /* Use for empty dirs */
+    display: inline-block;
+    width: 14px; /* Match checkbox */
+    height: 14px; /* Match checkbox */
+    margin: 0 5px 0 0;
+    flex-shrink: 0;
+}
+
+/* Icon */
+.node-icon {
+    margin-right: 3px;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+/* Node Name Span */
+.node-name {
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 1px 3px;
+    border-radius: 2px;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Search Highlight (on name) */
+.node-name.highlight {
+    background-color: var(--highlight-background-color); /* Yellowish */
+    color: var(--highlight-text-color); /* Dark text */
+    border-radius: 2px;
+    padding: 0 2px;
+    margin: 0 -2px; /* Prevent layout shift */
+}
+
+/* Node Stats (Lines/Tokens/Time) */
+.node-stats {
+    margin-left: auto; /* Push to the right */
+    padding-left: 10px;
+    font-size: 0.8em; /* Smaller font */
+    color: #aaa;
+    white-space: nowrap;
+    flex-shrink: 0; /* Prevent wrapping */
+}
+.node-stats span { /* Individual stat items */
+    margin-left: 6px;
+}
+.node-stats .lines { color: #6ef076; } /* Green */
+.node-stats .tokens { color: #f0b76e; } /* Orange */
+.node-stats .time { color: #6ebbf0; } /* Blue */
+.node-stats .selected-count { color: #f0b76e; } /* Orange for selected count */
+
+
+/* --------------------------------------------------------------------------
+   Aggregator Panel (Right side of main-content-split)
+   -------------------------------------------------------------------------- */
+.right-panel-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    padding: 1em;
+    height: 100%;
+    box-sizing: border-box;
+    gap: 0.5em; /* Space between header, textarea, actions */
+}
+
+/* Panel header with title and stats */
+.aggregator-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid var(--border-secondary-color);
+}
+.aggregator-header h3 {
+    margin: 0;
+}
+.aggregator-header span { /* Style for token count etc */
+    font-size: 0.9em;
+    color: var(--label-text-color);
+}
+
+/* Text area for aggregated content */
+.aggregator-content {
+    flex-grow: 1;
+    width: 100%;
+    box-sizing: border-box;
+    background-color: var(--background-secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.5em;
+    font-size: 0.9em;
+    overflow: auto;
+    resize: none;
+    font-family: monospace;
+    white-space: pre; /* Preserve whitespace */
+}
+/* Add placeholder styling */
+.aggregator-content::placeholder {
+    color: #888;
+    font-style: italic;
+}
+
+/* Container for aggregator action buttons */
+.aggregator-actions {
+    text-align: right;
+    margin-top: 0.5em;
+    flex-shrink: 0;
+}
+.aggregator-actions button {
+    margin-left: 0.5em;
+    padding: 0.5rem 1rem; /* Standard button padding */
+}
+.aggregator-actions .copy-feedback { /* Style for 'Copied!' text */
+    color: limegreen;
+    margin-left: 0.5em;
+    font-size: 0.9em;
+}
+
+
+/* --------------------------------------------------------------------------
+   Status Bar (Bottom of app-container)
+   -------------------------------------------------------------------------- */
+.status-bar {
+  --status-bar-height: 30px;
+  height: var(--status-bar-height);
+  background-color: #222; /* PDK bottom bar color */
+  border-top: 1px solid var(--border-color); /* PDK border */
+  padding: 0 1em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85em;
+  color: #ccc; /* PDK text color */
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.status-bar-left, .status-bar-right {
+  display: flex;
+  gap: 1em;
+  align-items: center;
+}
+.status-bar span {
+  white-space: nowrap;
+}
+/* Color coding for stats (optional, matches PDK examples) */
+.status-bar .stat-files { color: #6ef076; }
+.status-bar .stat-folders { color: #f0b76e; }
+.status-bar .stat-lines { color: #6ef076; }
+.status-bar .stat-tokens { color: #f0b76e; }
+.status-bar .stat-time { color: #6ebbf0; }
+
+
+/* ==========================================================================
+   Modals & Overlays
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Scan Progress Overlay
+   -------------------------------------------------------------------------- */
+.scan-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: var(--overlay-background-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    color: var(--text-color);
+}
+.scan-indicator {
+    background-color: var(--card-bg-color); /* Use card background */
+    padding: 2em;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    text-align: center;
+    min-width: 300px;
+    box-shadow: 0 5px 15px var(--modal-shadow-color);
+}
+.scan-indicator h3 {
+    margin-top: 0;
+    margin-bottom: 1em;
+    font-weight: 500;
+}
+.scan-indicator progress {
+    width: 100%;
+    margin-bottom: 0.5em;
+    height: 8px;
+    accent-color: limegreen; /* Style the progress bar */
+}
+.scan-indicator progress::-webkit-progress-bar {
+   background-color: #555;
+   border-radius: 4px;
+}
+.scan-indicator progress::-webkit-progress-value {
+   background-color: limegreen;
+   border-radius: 4px;
+   transition: width 0.2s ease-in-out;
+}
+.scan-indicator progress::-moz-progress-bar {
+    background-color: limegreen;
+    border-radius: 4px;
+}
+.scan-path {
+    font-size: 0.8em;
+    color: var(--label-text-color);
+    margin-top: 0.5em;
+    margin-bottom: 1em;
+    max-width: 400px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    direction: ltr; /* Ensure ellipsis at end */
+}
+.scan-indicator button { /* Style cancel button */
+    margin-top: 1em;
+    padding: 0.5rem 1rem;
+}
+
+/* --------------------------------------------------------------------------
+   File Viewer Modal
+   -------------------------------------------------------------------------- */
+.file-viewer-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: var(--overlay-background-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+}
+.file-viewer-modal-content {
+    background-color: var(--background-tertiary-color); /* Modal background */
+    padding: 1em;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    width: 80%;
+    max-width: 1000px;
+    height: 80%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 5px 15px var(--modal-shadow-color);
+}
+.file-viewer-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8em; /* More space */
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border-secondary-color); /* Add separator */
+    padding-bottom: 0.5em;
+}
+.file-viewer-modal-header h4 {
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 1.1em; /* Slightly larger title */
+}
+.file-viewer-modal-header button { /* Style close button */
+    padding: 0.3em 0.8em;
+    background-color: var(--card-bg-color); /* Match other buttons */
+    border: 1px solid var(--border-color);
+    margin: 0;
+}
+.file-viewer-modal-header button:hover {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+.file-viewer-modal-body {
+    flex-grow: 1;
+    overflow: auto;
+    background-color: var(--background-secondary-color); /* Code area background */
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.8em; /* More padding */
+    font-family: monospace;
+    white-space: pre;
+    font-size: 0.9em;
+    color: var(--text-color);
+}
+.file-viewer-modal-body p { /* Styling for loading/error messages */
+    padding: 1em;
+    text-align: center;
+    white-space: pre-wrap;
+    color: #aaa; /* Dimmer text */
+    font-style: italic;
+}
+.file-viewer-modal-body pre {
+    margin: 0;
+}
+
+/* Utility Styles */
+.flex-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+
+
+/* Light Theme Overrides - Remove if not needed or adjust vars */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg-color: #ffffff;
+    --text-color: #213547;
+    --accent-color: #396cd8;
+    --active-tab-bg-color: #e0e8f7;
+    --active-tab-border-color: #a0b3d7;
+    --border-color: #ccc;
+    --card-bg-color: #f8f8f8;
+    --card-bg-color2: #f0f0f0;
+    --danger-color: #d33;
+    --sidebar-bg-color: #e8f0f4;
+    --background-color: #ffffff;
+    --background-secondary-color: #f8f8f8;
+    --background-tertiary-color: #fdfdfd;
+    --background-accent-color: #f0f0f0;
+    --border-secondary-color: #ddd;
+    --link-hover-color: #747bff;
+    --input-background-color: #eee;
+    --input-text-color: #222;
+    --label-text-color: #555;
+    --highlight-background-color: #fff380; /* Light yellow */
+    --highlight-text-color: #333;
+    --overlay-background-color: rgba(255, 255, 255, 0.7);
+    --modal-shadow-color: rgba(0, 0, 0, 0.1);
+  }
+
+  button {
+    background-color: #f9f9f9;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+  }
+  button:hover {
+    background-color: var(--accent-color);
+    color: #fff; /* Text white on accent hover */
+    border-color: var(--accent-color);
+  }
+   button.delete-btn {
+     background-color: var(--danger-color);
+     border-color: var(--danger-color);
+     color: #fff;
+   }
+   button.delete-btn:hover {
+     background-color: #b00;
+     border-color: #b00;
+   }
+   button:disabled {
+     background-color: #e0e0e0;
+     border-color: #d0d0d0;
+     color: #999;
+   }
+
+  .sidebar { border-right-color: var(--border-color); background-color: var(--sidebar-bg-color); }
+  .file-tree-container { border-right-color: var(--border-secondary-color); }
+  .aggregator-content { background-color: var(--background-secondary-color); border-color: var(--border-color); }
+  .profile-form { border-color: var(--border-color); background-color: var(--card-bg-color2); }
+  .search-container { border-bottom-color: var(--border-secondary-color); }
+  .aggregator-header { border-bottom-color: var(--border-secondary-color); }
+  .status-bar { background-color: #f0f0f0; border-top-color: var(--border-color); color: #555; }
+
+  .file-tree-node:hover { background-color: rgba(0, 0, 0, 0.03); }
+  .file-tree-node.highlighted { background-color: #eee; }
+  .node-name.highlight { background-color: var(--highlight-background-color); color: var(--highlight-text-color); }
+
+  .scan-overlay { color: #333; }
+  .scan-indicator { background-color: var(--background-tertiary-color); border: 1px solid var(--border-color); }
+  .scan-path { color: var(--label-text-color); }
+  .scan-indicator progress { accent-color: #4caf50; } /* Green progress bar */
+  .scan-indicator progress::-webkit-progress-value { background-color: #4caf50; }
+  .scan-indicator progress::-moz-progress-bar { background-color: #4caf50; }
+
+  .file-viewer-modal-content { background-color: var(--background-tertiary-color); border: 1px solid var(--border-color); }
+  .file-viewer-modal-header button { background-color: #ddd; color: #333; border-color: #ccc; }
+  .file-viewer-modal-header button:hover { background-color: #ccc; }
+  .file-viewer-modal-body { background-color: var(--background-color); border-color: var(--border-color); color: var(--text-color); }
+  .file-viewer-modal-body p { color: #777; }
+}
