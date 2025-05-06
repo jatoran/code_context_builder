@@ -43,33 +43,31 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, select
         <>
             <div className="aggregator-header">
                 <h3>Aggregated Context</h3>
-                <div className="aggregator-controls" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <div>
-                        <label htmlFor="formatSelect" style={{ marginRight: '5px', fontSize: '0.9em' }}>Format:</label>
+                <div className="aggregator-controls">
+                    <div className="control-item">
+                        <label htmlFor="formatSelect">Format:</label>
                         <select
                             id="formatSelect"
                             value={selectedFormat}
                             onChange={(e) => setSelectedFormat(e.target.value as OutputFormat)}
                             disabled={isLoading}
-                            style={{ padding: '0.3em 0.5em', fontSize: '0.9em' }}
                         >
                             <option value="markdown">Markdown</option>
                             <option value="xml">XML</option>
                             <option value="raw">Raw</option>
                         </select>
                     </div>
-                    <div>
+                    <div className="control-item">
                         <input
                             type="checkbox"
                             id="prependTree"
                             checked={prependFileTree}
                             onChange={(e) => setPrependFileTree(e.target.checked)}
                             disabled={isLoading}
-                            style={{ marginRight: '5px', verticalAlign: 'middle' }}
                         />
-                        <label htmlFor="prependTree" style={{ fontSize: '0.9em', verticalAlign: 'middle' }}>Prepend File Tree</label>
+                        <label htmlFor="prependTree">Prepend Tree</label>
                     </div>
-                     <span style={{fontSize: '0.9em', color: 'var(--label-text-color)'}}>
+                     <span className="aggregator-stats-display">
                         {selectedPaths.size} file{selectedPaths.size === 1 ? '' : 's'} selected |
                         ~{tokenCount.toLocaleString()} tokens
                     </span>

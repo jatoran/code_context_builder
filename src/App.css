@@ -546,7 +546,7 @@ label {
 /* --------------------------------------------------------------------------
    Aggregator Panel (in Left Panel)
    -------------------------------------------------------------------------- */
-.left-panel-aggregator {
+   .left-panel-aggregator {
     display: flex;
     flex-direction: column;
     height: 100%; 
@@ -569,16 +569,51 @@ label {
 }
 .aggregator-controls { 
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: wrap; /* Allow wrapping on small screens */
     align-items: center;
-    gap: 0.8em; 
+    gap: 0.8em; /* Gap between control groups */
     width: 100%; 
 }
-.aggregator-header span { 
+
+/* New styles for individual control groups and their elements */
+.aggregator-controls .control-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4em; /* Gap between label and its control */
+}
+
+.aggregator-controls .control-item label {
+    display: inline-block; /* Override global block style for labels */
+    margin-bottom: 0; /* Remove default margin from global label style */
     font-size: 0.9em;
     color: var(--label-text-color);
-    margin-left: auto; 
+    white-space: nowrap; /* Prevent label text from wrapping */
 }
+
+.aggregator-controls .control-item select {
+    padding: 0.3em 0.5em; /* Consistent padding */
+    font-size: 0.9em;
+    margin: 0; /* Remove any default margin */
+    /* Inherits global select styles for background, border, etc. */
+}
+
+.aggregator-controls .control-item input[type="checkbox"] {
+    padding: 0; /* Checkboxes don't need padding */
+    margin: 0 0.2em 0 0; /* Adjust margin slightly for alignment */
+    width: auto; /* Override global input width if set */
+    height: auto; /* Override global input height if set */
+    vertical-align: middle; /* Align checkbox with label text */
+    /* Inherits global checkbox styles for accent-color, etc. */
+}
+
+.aggregator-stats-display { /* Renamed from .aggregator-header span */
+    font-size: 0.9em;
+    color: var(--label-text-color);
+    margin-left: auto; /* Push to the right */
+    white-space: nowrap;
+    padding-left: 0.5em; /* Add some space if it's near other controls */
+}
+
 
 .aggregator-content {
     flex-grow: 1; 
