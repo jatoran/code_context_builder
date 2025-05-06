@@ -7,8 +7,8 @@ import {
     getAllDescendantFilePaths,
     nodeOrDescendantMatches,
     formatTimeAgo,
-    getDescendantFileStats, // Added import
-    DescendantStats // Added import for type
+    // getDescendantFileStats, // No longer needed for displaying base folder stats
+    // DescendantStats // No longer needed for displaying base folder stats
 } from './fileTreeUtils';
 
 interface FileTreeNodeProps {
@@ -71,9 +71,14 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
             e.preventDefault();
             onViewFile(node.path);
         } else {
+            // For directories, clicking the name should also toggle expansion if it's not just about selection
+            // If you want name click to ONLY select/deselect, remove the onToggleExpand part for dirs
+            if (node.is_dir) {
+                onToggleExpand(node.path); 
+            }
             onToggleSelection(node.path, node.is_dir);
         }
-    }, [node.path, node.is_dir, onToggleSelection, onViewFile]);
+    }, [node, onToggleSelection, onViewFile, onToggleExpand]); // Added node and onToggleExpand
     
     const descendantFilePaths = useMemo(() => {
         if (node.is_dir) {
@@ -94,7 +99,13 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
         
         const totalDescendantFiles = descendantFilePaths.length;
 
-        if (totalDescendantFiles === 0) return 'none'; 
+        if (totalDescendantFiles === 0 && node.children && node.children.length > 0) { 
+            // This case is for a directory that contains only other empty directories.
+            // It has children, but no actual files to select/count.
+            return 'none'; // Or 'unchecked' if you prefer it to be selectable for some reason
+        }
+        if (totalDescendantFiles === 0) return 'none'; // Directory with no files at all
+
 
         if (selectedDescendantCount === 0) return 'unchecked';
         if (selectedDescendantCount === totalDescendantFiles) return 'checked';
@@ -102,23 +113,42 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
 
     }, [node, selectedPaths, descendantFilePaths, selectedDescendantCount]); 
 
-    const folderStats: DescendantStats | null = useMemo(() => {
-        if (node.is_dir && isOpen) { // Calculate only for open directories
-            return getDescendantFileStats(node);
-        }
-        return null;
-    }, [node, isOpen]);
+    // REMOVED: folderStats calculation using getDescendantFileStats.
+    // We will now directly use node.lines and node.tokens for directories.
+    // const folderStats: DescendantStats | null = useMemo(() => {
+    //     if (node.is_dir && isOpen) { // Calculate only for open directories
+    //         return getDescendantFileStats(node);
+    //     }
+    //     return null;
+    // }, [node, isOpen]);
 
     const isNodeStale = useMemo(() => 
         !node.is_dir && outOfDateFilePaths.has(node.path),
     [node, outOfDateFilePaths]);
 
     const hasStaleDescendants = useMemo(() => {
-        if (!node.is_dir || !isOpen) return false; 
-        // Optimization: use pre-calculated descendantFilePaths if available, otherwise re-calculate
-        const filesToCheck = descendantFilePaths.length > 0 ? descendantFilePaths : getAllDescendantFilePaths(node);
-        return filesToCheck.some(path => outOfDateFilePaths.has(path));
-    }, [node, isOpen, outOfDateFilePaths, descendantFilePaths]);
+        if (!node.is_dir) return false; // Only check for directories
+        // If it's collapsed, we can't visually see stale descendants within it directly,
+        // but the backend `FileNode` for the directory itself doesn't carry a "contains_stale_child" flag.
+        // For visual cue on the folder itself when collapsed, this check needs to happen
+        // regardless of isOpen if we want to style the folder icon/name.
+        // However, if `outOfDateFilePaths` contains the folder's own path (if folders could be stale), it's different.
+        // Let's assume for now this is about files *within* an open folder for visual cues.
+        // If we want a cue on a collapsed folder *if it contains* stale files, this logic would need
+        // to run on its children data even if not visibly rendered.
+        // For now, let's keep it tied to `isOpen` for performance, or remove isOpen dependency if
+        // a persistent stale marker on closed folders is desired.
+        // For simplicity, let's assume the 'dir-contains-stale' class is primarily for when it's open.
+        // If we need it for closed folders, we'd iterate node.children here.
+        // The backend FileNode for the directory itself does not have a "contains_stale_children" flag.
+        // We use getAllDescendantFilePaths to check this.
+        if (node.children && node.children.length > 0) {
+            const filesToCheck = getAllDescendantFilePaths(node); // Check all descendants
+            return filesToCheck.some(path => outOfDateFilePaths.has(path));
+        }
+        return false;
+    }, [node, outOfDateFilePaths]);
+
 
     if (searchTerm && !isVisible) {
         return null;
@@ -127,7 +157,9 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
 
     const nodeClasses = ['file-tree-node'];
     if (isHighlighted) nodeClasses.push('highlighted');
-    if (hasStaleDescendants) nodeClasses.push('dir-contains-stale');
+    // Apply 'dir-contains-stale' regardless of isOpen if the directory itself has stale descendants
+    if (node.is_dir && hasStaleDescendants) nodeClasses.push('dir-contains-stale');
+
 
     return (
         <li
@@ -169,19 +201,22 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                 </span>
 
                 <span className="node-stats">
+                    {/* For Files: Show individual stats */}
                     {!node.is_dir && (
                         <>
-                          {node.lines > 0 && <span className="lines">{node.lines}L</span>}
-                          {node.tokens > 0 && <span className="tokens">{node.tokens}T</span>}
+                          {node.lines > 0 && <span className="lines">{node.lines.toLocaleString()}L</span>}
+                          {node.tokens > 0 && <span className="tokens">~{node.tokens.toLocaleString()}T</span>}
                           {node.last_modified && <span className="time">{formatTimeAgo(node.last_modified)}</span>}
                         </>
                     )}
-                     {node.is_dir && folderStats && folderStats.totalFiles > 0 && (
+                    {/* For Directories: ALWAYS show aggregated L/T from node object itself */}
+                     {node.is_dir && (node.lines > 0 || node.tokens > 0) && ( // Only show if there are lines or tokens
                         <>
-                            {folderStats.totalLines > 0 && <span className="folder-total-lines lines">{folderStats.totalLines.toLocaleString()}L</span>}
-                            {folderStats.totalTokens > 0 && <span className="folder-total-tokens tokens">~{folderStats.totalTokens.toLocaleString()}T</span>}
+                            {node.lines > 0 && <span className="folder-total-lines lines">{node.lines.toLocaleString()}L</span>}
+                            {node.tokens > 0 && <span className="folder-total-tokens tokens">~{node.tokens.toLocaleString()}T</span>}
                         </>
                      )}
+                     {/* Selected count for directories (remains useful) */}
                      {node.is_dir && checkboxState !== 'none' && descendantFilePaths.length > 0 && (
                          <span className="selected-count">
                              ({selectedDescendantCount}/{descendantFilePaths.length} sel.)

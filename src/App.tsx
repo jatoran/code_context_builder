@@ -274,14 +274,14 @@ function App() {
 
     const stopFileMonitoring = useCallback(async () => {
         if (isMonitoringProfile !== null) { 
-            console.log("[App Monitor] Attempting to stop monitoring for profile:", isMonitoringProfile);
+            // console.log("[App Monitor] Attempting to stop monitoring for profile:", isMonitoringProfile);
             try {
                 await invoke("stop_monitoring_profile_cmd");
-                console.log("[App Monitor] Successfully stopped monitoring for profile:", isMonitoringProfile);
+                // console.log("[App Monitor] Successfully stopped monitoring for profile:", isMonitoringProfile);
                 setIsMonitoringProfile(null);
                 setOutOfDateFilePaths(new Set()); 
             } catch (err) {
-                console.error("[App Monitor] Failed to stop file monitoring for profile " + isMonitoringProfile + ":", err);
+                // console.error("[App Monitor] Failed to stop file monitoring for profile " + isMonitoringProfile + ":", err);
             }
         }
     }, [isMonitoringProfile]); 
@@ -292,35 +292,35 @@ function App() {
         if (profileId > 0 && currentTreeData) {
             const filesToMonitorMap = getMonitorableFilesFromTree(currentTreeData);
             if (Object.keys(filesToMonitorMap).length > 0) {
-                console.log(`[App Monitor] Preparing to start monitoring for profile ${profileId} with ${Object.keys(filesToMonitorMap).length} files.`);
+                // console.log(`[App Monitor] Preparing to start monitoring for profile ${profileId} with ${Object.keys(filesToMonitorMap).length} files.`);
                 try {
                     const payload = { profileId, filesToMonitor: filesToMonitorMap }; 
-                    console.log("[App Monitor] Invoking start_monitoring_profile_cmd with payload:", JSON.stringify(payload, null, 2));
+                    // console.log("[App Monitor] Invoking start_monitoring_profile_cmd with payload:", JSON.stringify(payload, null, 2));
                     await invoke("start_monitoring_profile_cmd", payload);
                     setIsMonitoringProfile(profileId);
                     setOutOfDateFilePaths(new Set()); 
                 } catch (err) {
-                    console.error("[App Monitor] Failed to start file monitoring for profile " + profileId + ":", err);
+                    // console.error("[App Monitor] Failed to start file monitoring for profile " + profileId + ":", err);
                     setIsMonitoringProfile(null); 
                 }
             } else {
-                console.log("[App Monitor] No files to monitor for profile", profileId);
+                // console.log("[App Monitor] No files to monitor for profile", profileId);
                 setIsMonitoringProfile(null); 
             }
         } else {
-            console.log("[App Monitor] startFileMonitoring called with invalid profileId or no treeData. Monitoring will be stopped/remain_stopped.");
+            // console.log("[App Monitor] startFileMonitoring called with invalid profileId or no treeData. Monitoring will be stopped/remain_stopped.");
             setIsMonitoringProfile(null); 
         }
     }, [stopFileMonitoring]);
 
     
     useEffect(() => {
-        console.log(`[App Monitor Effect] Running. Profile ID: ${selectedProfileId}, Tree Data Present: ${!!treeData}`);
+        // console.log(`[App Monitor Effect] Running. Profile ID: ${selectedProfileId}, Tree Data Present: ${!!treeData}`);
         if (selectedProfileId > 0 && treeData) {
-            console.log(`[App Monitor Effect] Conditions met, calling startFileMonitoring for profile ${selectedProfileId}.`);
+            // console.log(`[App Monitor Effect] Conditions met, calling startFileMonitoring for profile ${selectedProfileId}.`);
             startFileMonitoring(selectedProfileId, treeData);
         } else {
-            console.log(`[App Monitor Effect] Conditions NOT met, calling stopFileMonitoring.`);
+            // console.log(`[App Monitor Effect] Conditions NOT met, calling stopFileMonitoring.`);
             stopFileMonitoring();
         }
     }, [selectedProfileId, treeData, startFileMonitoring, stopFileMonitoring]);
@@ -330,11 +330,11 @@ function App() {
         const setupFreshnessListener = async () => {
             try {
                 unlistenFreshness = await listen<string[]>("file-freshness-update", (event) => {
-                    console.log("[App Monitor] Received file-freshness-update:", event.payload);
+                    // console.log("[App Monitor] Received file-freshness-update:", event.payload);
                     setOutOfDateFilePaths(new Set(event.payload));
                 });
             } catch (err) {
-                console.error("[App Monitor] Failed to set up file freshness listener:", err);
+                // console.error("[App Monitor] Failed to set up file freshness listener:", err);
             }
         };
         setupFreshnessListener();
@@ -380,23 +380,23 @@ function App() {
     }, []); 
 
     useEffect(() => {
-        console.log("[APP MountEffect] Component mounted, calling loadProfiles.");
+        // console.log("[APP MountEffect] Component mounted, calling loadProfiles.");
         loadProfiles();
     }, [loadProfiles]); 
 
     useEffect(() => {
         const profile = profiles.find(p => p.id === selectedProfileId);
-        console.log(`[APP MainEffect] Running. selectedProfileId: ${selectedProfileId}, prevProfileId.current: ${prevProfileId.current}, Profile found: ${!!profile}`);
+        // console.log(`[APP MainEffect] Running. selectedProfileId: ${selectedProfileId}, prevProfileId.current: ${prevProfileId.current}, Profile found: ${!!profile}`);
 
         if (prevProfileId.current !== selectedProfileId) { 
-            console.log(`[APP MainEffect] Profile ID changed from ${prevProfileId.current} to ${selectedProfileId}.`);
+            // console.log(`[APP MainEffect] Profile ID changed from ${prevProfileId.current} to ${selectedProfileId}.`);
             
             setEditableTitle(profile?.title || "");
             setEditableRootFolder(profile?.root_folder || "");
             setEditableIgnorePatterns(profile?.ignore_patterns?.join("\n") || "");
 
             if (selectedProfileId > 0) {
-                console.log(`[APP MainEffect] Storing ccb_lastSelectedProfileId: ${selectedProfileId}`);
+                // console.log(`[APP MainEffect] Storing ccb_lastSelectedProfileId: ${selectedProfileId}`);
                 localStorage.setItem('ccb_lastSelectedProfileId', selectedProfileId.toString());
                 
                 const storedTreeJson = localStorage.getItem(`ccb_treeData_${selectedProfileId}`);
@@ -729,7 +729,7 @@ function App() {
 
     useEffect(() => {
         return () => {
-            console.log("[App Monitor] App unmounting, ensuring monitor is stopped.");
+            // console.log("[App Monitor] App unmounting, ensuring monitor is stopped.");
             stopFileMonitoring();
         };
     }, [stopFileMonitoring]); 

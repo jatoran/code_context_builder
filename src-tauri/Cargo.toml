@@ -26,3 +26,4 @@ tauri-plugin-dialog = "2"
 rusqlite = { version = "0.31", features = ["bundled", "chrono"] }
 chrono = { version = "0.4", features = ["serde"] }
 rayon = "1.8"
+tiktoken-rs = "0.6"

@@ -1,19 +1,21 @@
 // src-tauri/src/utils.rs
-use tauri::command; // <-- ADDED
+use tauri::command;
+use tiktoken_rs::cl100k_base;
 
-// Basic whitespace-based token approximation. Replace with a proper tokenizer later if needed.
+// Updated to use tiktoken-rs for a more accurate token count.
 pub fn approximate_token_count(text: &str) -> usize {
-    text.split_whitespace().count()
-    // A slightly better approximation might be:
-    // (text.split_whitespace().count() as f64 * 1.3) as usize
-    // Or integrate a real tokenizer like tiktoken-rs
+    match cl100k_base() {
+        Ok(bpe) => bpe.encode_with_special_tokens(text).len(),
+        Err(e) => {
+            eprintln!("Failed to load cl100k_base tokenizer: {:?}. Falling back to whitespace count.", e);
+            // Fallback to a rough approximation if tokenizer fails to load
+            text.split_whitespace().count()
+        }
+    }
 }
 
-// --- NEW COMMAND ---
 #[command]
 pub fn get_text_token_count(text: String) -> Result<usize, String> {
-    // Currently uses the simple approximation.
-    // Can be enhanced later without changing the frontend call signature.
+    // Uses the updated approximate_token_count which now employs tiktoken-rs.
     Ok(approximate_token_count(&text))
 }
-// -------------------

@@ -1,4 +1,5 @@
 
+
 // src/hooks/useAggregator.ts
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -11,7 +12,7 @@ import {
     getLanguageFromPath,
 } from '../components/CodeContextBuilder/Aggregator/aggregatorUtils';
 
-export type OutputFormat = 'markdown' | 'xml';
+export type OutputFormat = 'markdown' | 'xml' | 'raw';
 
 interface AggregatorSettings {
     format: OutputFormat;
@@ -74,7 +75,7 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
                 const storedSettingsRaw = localStorage.getItem(`ccb_agg_settings_${selectedProfileId}`);
                 if (storedSettingsRaw) {
                     const settings: AggregatorSettings = JSON.parse(storedSettingsRaw);
-                    setCurrentSelectedFormat(settings.format && (settings.format === 'markdown' || settings.format === 'xml') ? settings.format : 'markdown');
+                    setCurrentSelectedFormat(settings.format && ['markdown', 'xml', 'raw'].includes(settings.format) ? settings.format : 'markdown');
                     setCurrentPrependFileTree(typeof settings.prependTree === 'boolean' ? settings.prependTree : false);
                 } else {
                     setCurrentSelectedFormat('markdown');
@@ -219,10 +220,11 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
         
         if (formatToUse === 'markdown' && finalOutput.endsWith('---\n\n')) {
             finalOutput = finalOutput.slice(0, -5);
-        }
-        if (formatToUse === 'xml' && finalOutput.length > 0 && !finalOutput.endsWith('\n')) {
+        } else if (formatToUse === 'xml' && finalOutput.length > 0 && !finalOutput.endsWith('\n')) {
             finalOutput += '\n';
         }
+        // For 'raw' format, each file content from formatFileContent already ends with a single '\n'.
+        // No specific trailing character cleanup needed for raw format here.
 
         setAggregatedText(finalOutput);
 

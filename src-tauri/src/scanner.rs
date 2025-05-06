@@ -6,7 +6,7 @@ use crate::profiles; // To load profile details
 use crate::scan_cache::{self, CacheEntry}; // Use module prefix
 use crate::scan_state::{is_scan_cancelled, set_cancel_scan};
 use crate::types::FileNode;
-use crate::utils::approximate_token_count;
+use crate::utils::approximate_token_count; // This function is now more accurate
 
 // Import functions from the scan_tree module
 use crate::scan_tree::{build_tree_from_paths, file_modified_timestamp, gather_valid_items};
@@ -235,6 +235,7 @@ fn do_actual_scan(
             }
         };
         let lines = content.lines().count();
+        // THE LINE BELOW NOW USES THE MORE ACCURATE TOKENIZER FROM utils.rs
         let tokens = approximate_token_count(&content);
         let new_entry = CacheEntry { last_modified: last_mod_str, size: file_size, lines, tokens };
         {
@@ -305,7 +306,8 @@ fn emit_progress(
     let count = processed_count.fetch_add(1, Ordering::Relaxed) + 1;
     let percentage = if total_items > 0 { (count as f64 / total_items as f64) * 100.0 } else { 100.0 };
 
-    if let Ok(_guard) = lock.try_lock() {
+    // Try to lock for throttling progress updates. If lock is held, skip emitting.
+    if let Ok(_guard) = lock.try_lock() { 
         let short_path = path
             .file_name()
             .map(|os| os.to_string_lossy())

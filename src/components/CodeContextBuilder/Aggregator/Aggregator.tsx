@@ -1,3 +1,4 @@
+
 // src/components/CodeContextBuilder/Aggregator/Aggregator.tsx
 import React, { useEffect } from 'react'; // Added useEffect
 import { FileNode } from '../../../types/scanner';
@@ -54,6 +55,7 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, select
                         >
                             <option value="markdown">Markdown</option>
                             <option value="xml">XML</option>
+                            <option value="raw">Raw</option>
                         </select>
                     </div>
                     <div>
