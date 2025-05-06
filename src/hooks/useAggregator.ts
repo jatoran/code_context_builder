@@ -1,4 +1,3 @@
-
 // src/hooks/useAggregator.ts
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -89,59 +88,74 @@ export function useAggregator({ treeData, selectedPaths }: UseAggregatorProps): 
     }, [selectedPaths]);
 
     const generateAggregatedText = useCallback(async () => {
-        if (!treeData || selectedPaths.size === 0) {
+        setIsLoading(true);
+        setError(null);
+        setCopySuccess(false);
+        let textForPrependedTree = '';
+        let aggregatedCoreContent = '';
+
+        if (!treeData) {
             setAggregatedText('');
             setTokenCount(0);
-            setError(null);
             setIsLoading(false);
             return;
         }
 
-        setIsLoading(true);
-        setError(null);
-        setCopySuccess(false);
-        let finalOutput = '';
-
+        // Step 1: Generate prepended tree string if requested
         if (prependFileTree) {
-            finalOutput += generateFullScannedFileTree(treeData, selectedFormat);
-            finalOutput += "\n\n"; 
+            textForPrependedTree = generateFullScannedFileTree(treeData, selectedFormat);
         }
 
-        let aggregatedCoreContent = "";
-        if (treeData.is_dir) {
-            if (isDirRelevantForAggregation(treeData, selectedPaths)) {
-                aggregatedCoreContent += formatFolderHeader(treeData.name, treeData.path, selectedFormat, 1);
-                aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, 2, selectedFormat);
-                aggregatedCoreContent += formatFolderFooter(selectedFormat, 1);
-            } else {
-                 // If root itself isn't relevant but children might be (e.g. root is not part of selection path)
-                 // This case usually means we start iterating from children directly.
-                 // However, buildAggregatedContentRecursive starts from treeData.children anyway.
-                 // This direct call might be better to handle cases where treeData itself is not a "selected" folder but a container.
-                 aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, 1, selectedFormat);
-            }
-        } else if (selectedPaths.has(treeData.path)) { // Root is a single selected file
-            try {
-                const fileContent = await invoke<string>("read_file_contents", { filePath: treeData.path });
-                const lang = getLanguageFromPath(treeData.path);
-                aggregatedCoreContent += formatFileContent(treeData.path, treeData.name, fileContent, selectedFormat, 1, lang);
-            } catch (e) {
-                const lang = getLanguageFromPath(treeData.path);
-                const errorMsg = e instanceof Error ? e.message : String(e);
-                aggregatedCoreContent += formatFileContent(treeData.path, treeData.name, `// Error reading file: ${errorMsg}`, selectedFormat, 1, lang);
+        // Step 2: Aggregate core content if paths are selected
+        if (selectedPaths.size > 0) {
+            if (treeData.is_dir) {
+                // This logic ensures that if the root directory itself isn't directly part of selection path traversal
+                // but contains selected children, we still process its children.
+                // buildAggregatedContentRecursive will handle the selectedPaths filtering internally.
+                let rootRelevantForHeader = isDirRelevantForAggregation(treeData, selectedPaths);
+                
+                if (rootRelevantForHeader) {
+                    aggregatedCoreContent += formatFolderHeader(treeData.name, treeData.path, selectedFormat, 1);
+                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, 2, selectedFormat);
+                    aggregatedCoreContent += formatFolderFooter(selectedFormat, 1);
+                } else {
+                    // If root isn't "relevant" for a header (e.g., only deep children selected),
+                    // still try to build content from its children.
+                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, 1, selectedFormat);
+                }
+
+            } else if (selectedPaths.has(treeData.path)) { // Root is a single selected file
+                try {
+                    const fileContent = await invoke<string>("read_file_contents", { filePath: treeData.path });
+                    const lang = getLanguageFromPath(treeData.path);
+                    aggregatedCoreContent += formatFileContent(treeData.path, treeData.name, fileContent, selectedFormat, 1, lang);
+                } catch (e) {
+                    const lang = getLanguageFromPath(treeData.path);
+                    const errorMsg = e instanceof Error ? e.message : String(e);
+                    aggregatedCoreContent += formatFileContent(treeData.path, treeData.name, `// Error reading file: ${errorMsg}`, selectedFormat, 1, lang);
+                }
             }
         }
         
-        finalOutput += aggregatedCoreContent;
-
+        // Step 3: Combine tree and content
+        let finalOutput = '';
+        if (textForPrependedTree.length > 0) {
+            finalOutput += textForPrependedTree;
+            if (aggregatedCoreContent.length > 0) {
+                finalOutput += "\n\n" + aggregatedCoreContent;
+            }
+        } else {
+            finalOutput = aggregatedCoreContent;
+        }
+        
+        // Post-processing: Ensure Markdown doesn't end with superfluous separator
+        // and XML has a final newline if content exists.
         if (selectedFormat === 'markdown' && finalOutput.endsWith('---\n\n')) {
             finalOutput = finalOutput.slice(0, -5);
         }
-        // Ensure final newline for XML if content exists
         if (selectedFormat === 'xml' && finalOutput.length > 0 && !finalOutput.endsWith('\n')) {
             finalOutput += '\n';
         }
-
 
         setAggregatedText(finalOutput);
 
