@@ -1,7 +1,5 @@
 // src/components/CodeContextBuilder/ProfileManager/ProfileManager.tsx
-// Update to manage form visibility, pass correct props, match PDK layout
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Profile } from '../../../types/profiles';
 import ProfileManagerForm from './ProfileManagerForm';
 
@@ -13,16 +11,15 @@ interface ProfileManagerProps {
   setProfileTitle: (value: string) => void;
   rootFolder: string;
   setRootFolder: (value: string) => void;
-  ignoreText: string; // Expecting newline-separated string for textarea
+  ignoreText: string;
   setIgnoreText: (value: string) => void;
-  onSaveProfile: () => void;
+  onSaveProfile: () => Promise<'saved' | 'error' | 'no_profile'>; // Updated signature
   onCreateProfile: () => void;
   onDeleteProfile: () => void;
   onScanProfile: () => void;
   isScanning: boolean;
 }
 
-// Basic localStorage helpers (copied from standalone App.tsx, consider moving to utils)
 function safeSetItem(key: string, value: any) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.warn("localStorage setItem error:", e); }
 }
@@ -30,6 +27,7 @@ function safeGetItem<T>(key: string, defaultValue: T): T {
     try { const item = localStorage.getItem(key); return item ? JSON.parse(item) : defaultValue; } catch (e) { console.warn("localStorage getItem error:", e); return defaultValue; }
 }
 
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const ProfileManager: React.FC<ProfileManagerProps> = ({
   profiles,
@@ -47,10 +45,10 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
   onScanProfile,
   isScanning,
 }) => {
-  // State to control visibility of the detailed settings form
   const [showSettings, setShowSettings] = useState<boolean>(() => safeGetItem('ccb_showProfileSettings', true));
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const saveTimeoutRef = useRef<number | null>(null);
 
-  // Persist the show/hide state
   useEffect(() => {
       safeSetItem('ccb_showProfileSettings', showSettings);
   }, [showSettings]);
@@ -58,10 +56,57 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
   const hasProfiles = profiles.length > 0;
   const profileSelected = selectedProfileId > 0;
 
+  const triggerAutoSave = useCallback(() => {
+    if (!profileSelected) return;
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    setSaveStatus('saving');
+    saveTimeoutRef.current = window.setTimeout(async () => {
+      const result = await onSaveProfile();
+      if (result === 'saved') {
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 1500);
+      } else {
+        setSaveStatus('error');
+        // Persist error state a bit longer or until next change
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      }
+    }, 750); // 750ms debounce
+  }, [onSaveProfile, profileSelected]);
+
+  // Auto-save on relevant field changes
+  useEffect(() => {
+    if (profileSelected && !isScanning) { // Only trigger if a profile is selected and not scanning
+      triggerAutoSave();
+    }
+    // Cleanup timeout on unmount or when dependencies change before next trigger
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [profileTitle, rootFolder, ignoreText, profileSelected, isScanning, triggerAutoSave]);
+
+
+  const getSaveStatusMessage = () => {
+    switch(saveStatus) {
+        case 'saving': return 'Saving...';
+        case 'saved': return 'Saved ✓';
+        case 'error': return 'Save Error!';
+        default: return '';
+    }
+  };
+
   return (
-    // Using CSS classes defined in App.css matching PDK style
     <div className="profile-manager">
-      <h3>Profile Manager</h3>
+      <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+        <h3>Profile Manager</h3>
+        {profileSelected && saveStatus !== 'idle' && (
+            <span className={`save-status ${saveStatus} visible`}>{getSaveStatusMessage()}</span>
+        )}
+      </div>
       <div className="profile-controls">
         <select
           value={selectedProfileId}
@@ -72,14 +117,13 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
           <option value={0} disabled={hasProfiles}>-- Select Profile --</option>
           {profiles.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.title} {/* Maybe add (ID: {p.id}) if needed */}
+              {p.title}
             </option>
           ))}
         </select>
 
-        {/* Buttons matching PDK layout */}
-        <button onClick={onCreateProfile} disabled={isScanning} title="Create a new profile">New</button>
-        <button onClick={onDeleteProfile} disabled={!profileSelected || isScanning} title="Delete the selected profile">Delete</button>
+        <button onClick={onCreateProfile} disabled={isScanning} title="Create a new profile">➕</button>
+        <button onClick={onDeleteProfile} disabled={!profileSelected || isScanning} title="Delete the selected profile">🗑️</button>
         <button
            onClick={onScanProfile}
            disabled={!profileSelected || isScanning}
@@ -89,14 +133,17 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
                "Scan files for selected profile"
             }
         >
-           {isScanning ? 'Scanning...' : 'Scan Profile'}
+           {isScanning ? '⏳' : '🔍'} {/* Using hourglass for scanning */}
         </button>
-        <button onClick={() => setShowSettings(!showSettings)} disabled={isScanning || !profileSelected} title="Show/Hide detailed profile settings">
-          {showSettings ? 'Hide Settings' : 'Show Settings'}
+        <button 
+            onClick={() => setShowSettings(!showSettings)} 
+            disabled={isScanning || !profileSelected} 
+            title={showSettings ? "Hide Profile Settings" : "Show Profile Settings"}
+        >
+          {showSettings ? '⚙️' : '⚙️'} {/* Consider different icons if desired, e.g. eye */}
         </button>
       </div>
 
-      {/* Conditionally render the detailed form based on showSettings and profile selection */}
       {showSettings && profileSelected && (
         <ProfileManagerForm
           profileTitle={profileTitle}
@@ -105,10 +152,9 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
           setRootFolder={setRootFolder}
           ignoreText={ignoreText}
           setIgnoreText={setIgnoreText}
-          onSaveProfile={onSaveProfile}
+          // onSaveProfile is now handled by auto-save, no explicit button
         />
       )}
-      {/* Placeholder message if settings are shown but no profile is selected */}
        {showSettings && !profileSelected && (
          <p style={{marginTop: '1em', fontStyle: 'italic', color: '#aaa'}}>
              Select or create a profile to view and edit its settings.

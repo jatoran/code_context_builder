@@ -1,6 +1,6 @@
 
 // src/components/CodeContextBuilder/Aggregator/Aggregator.tsx
-import React from 'react';
+import React, { useEffect } from 'react'; // Added useEffect
 import { FileNode } from '../../../types/scanner';
 import { useAggregator, OutputFormat } from '../../../hooks/useAggregator'; // Import the hook
 
@@ -22,6 +22,21 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData }) => {
         handleCopyToClipboard,
         copySuccess,
     } = useAggregator({ treeData, selectedPaths });
+
+    // Listen for hotkey event to trigger copy
+    useEffect(() => {
+        const triggerCopy = () => {
+            if (typeof handleCopyToClipboard === 'function') {
+                handleCopyToClipboard();
+            }
+        };
+
+        window.addEventListener('hotkey-copy-aggregated', triggerCopy);
+        return () => {
+            window.removeEventListener('hotkey-copy-aggregated', triggerCopy);
+        };
+    }, [handleCopyToClipboard]);
+
 
     return (
         <>

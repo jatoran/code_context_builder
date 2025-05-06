@@ -14,7 +14,8 @@
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;
   color-scheme: dark;
-  --sidebar-bg-color: #112832;
+  --sidebar-bg-color: #112832; /* Let's use a slightly different color for the left panel */
+  --left-panel-bg-color: #1a2227; /* Darker for left panel */
 
   /* Added from Standalone App CSS for compatibility */
   --background-color: var(--bg-color); /* Map to PDK var */
@@ -94,29 +95,90 @@ html, body, #root {
     overflow: hidden;
 }
 
-/* Left Sidebar Area */
-.sidebar {
-  width: 350px; /* Adjust as needed */
-  min-width: 300px;
+/* Left Panel (Profile Manager + Aggregator) */
+.left-panel {
+  width: 380px; /* Adjust as needed */
+  min-width: 300px; /* Ensure it's usable when not fully collapsed */
   border-right: 1px solid var(--border-color);
-  padding: 1em;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   height: 100%; /* Full height within main-layout */
   box-sizing: border-box;
   flex-shrink: 0;
-  background-color: var(--sidebar-bg-color); /* PDK Sidebar color */
+  background-color: var(--left-panel-bg-color);
+  transition: width 0.3s ease-in-out, min-width 0.3s ease-in-out, padding 0.3s ease-in-out;
+  overflow: hidden; /* Hide content when collapsing */
+}
+.left-panel.collapsed {
+  width: 0px;
+  min-width: 0px;
+  padding-left: 0; /* Remove padding when collapsed */
+  padding-right: 0;
+  border-right: none;
+}
+.left-panel > div { /* Direct children of left-panel */
+    padding: 1em;
+    box-sizing: border-box;
+}
+.left-panel-profile-manager {
+    /* ProfileManager will take its natural height or a defined flex basis */
+    flex-shrink: 0; /* Don't shrink ProfileManager area much */
+    border-bottom: 1px solid var(--border-color); /* Separator */
+    overflow-y: auto; /* Scroll if content too tall */
+    max-height: 50%; /* Example: allow PM to take up to 50% */
+}
+.left-panel-aggregator {
+    flex-grow: 1; /* Aggregator takes remaining space */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Important for textarea to behave */
 }
 
-/* Right Area (Splits into File Tree and Aggregator/Other Views) */
-.main-content-split {
+/* File Tree main content area (Right side of split) */
+.file-tree-main-content {
     flex: 1;
     display: flex;
+    flex-direction: column; /* Stack header and tree */
     overflow: hidden;
     height: 100%;
     box-sizing: border-box;
+    background-color: var(--background-secondary-color); /* Different bg to distinguish */
 }
+.file-tree-header {
+    display: flex;
+    align-items: center;
+    padding: 0.5em 1em;
+    border-bottom: 1px solid var(--border-secondary-color);
+    flex-shrink: 0;
+    gap: 0.5em;
+}
+.file-tree-header h3 {
+    margin: 0;
+    flex-grow: 1;
+}
+.collapse-toggle-btn {
+    padding: 0.3em 0.6em;
+    font-size: 1em;
+    line-height: 1;
+    min-width: auto;
+    margin: 0;
+}
+.hotkeys-help-btn { /* New button style */
+    padding: 0.3em 0.6em;
+    font-size: 1em;
+    line-height: 1;
+    min-width: auto;
+    margin-left: 0.5em; 
+    background-color: transparent;
+    border: 1px solid transparent;
+    color: var(--label-text-color);
+}
+.hotkeys-help-btn:hover {
+    background-color: var(--card-bg-color); 
+    border-color: var(--border-color);
+    color: var(--text-color);
+}
+
 
 /* ==========================================================================
    Component Styles
@@ -139,6 +201,7 @@ button {
   border-radius: 6px; /* PDK radius */
   transition: background-color var(--transition-speed), border-color var(--transition-speed);
   margin: 0 4px; /* Default spacing */
+  font-size: 0.9em; /* Slightly smaller base button font */
 }
 button:hover {
   background-color: var(--accent-color); /* PDK hover */
@@ -203,16 +266,17 @@ label {
 
 
 /* --------------------------------------------------------------------------
-   Profile Manager (in Sidebar)
+   Profile Manager (in Left Panel)
    -------------------------------------------------------------------------- */
 .profile-manager {
   display: flex;
   flex-direction: column;
-  gap: 1em;
-  margin-bottom: 1em; /* Space below */
+  gap: 0.8em; /* Reduced gap */
+  /* margin-bottom: 1em; Space below is handled by parent or aggregator */
 }
 .profile-manager h3 {
     margin-bottom: 0.5em; /* Space below heading */
+    font-size: 1.1em; /* Slightly smaller */
 }
 .profile-controls {
   display: flex;
@@ -222,83 +286,103 @@ label {
 }
 .profile-controls select {
     flex-grow: 1;
-    min-width: 150px;
-    padding: 0.5rem; /* Match button/input padding */
+    min-width: 120px; /* Can be smaller */
+    padding: 0.4rem 0.6rem; /* Match button/input padding */
+    font-size: 0.9em;
 }
 .profile-controls button {
-    padding: 0.5rem 0.8rem; /* Adjust padding slightly */
-    margin: 0; /* Remove default margin */
+    padding: 0.4rem 0.6rem; /* Smaller buttons */
+    font-size: 1em; /* For icons */
+    margin: 0;
+    line-height: 1; /* Better icon alignment */
 }
 
 /* Profile Form Styling (using PDK classes/structure) */
 .profile-form {
-  margin-top: 1em;
-  border: 1px solid var(--border-color); /* Match PDK panel style */
-  padding: 1em; /* PDK padding */
-  border-radius: 4px; /* PDK radius */
-  background-color: var(--card-bg-color2); /* Slightly different background */
+  margin-top: 0.8em;
+  border: 1px solid var(--border-color);
+  padding: 0.8em; /* Reduced padding */
+  border-radius: 4px;
+  background-color: var(--card-bg-color2);
   display: flex;
   flex-direction: column;
-  gap: 0.8em;
+  gap: 0.6em; /* Reduced gap */
 }
-.form-row {
+.profile-form .form-field { /* New wrapper for label + input */
     display: flex;
-    align-items: center;
-    gap: 0.5em;
+    flex-direction: column; /* Label above input */
+    gap: 0.2em;
 }
-.form-row label {
-    flex-basis: 150px; /* Adjust if necessary */
-    flex-shrink: 0;
-    text-align: right;
-    margin-bottom: 0; /* Override default label margin */
+.profile-form label {
+    font-size: 0.85em;
+    margin-bottom: 0; /* No extra margin */
     color: var(--label-text-color);
+}
+.profile-form input[type="text"],
+.profile-form textarea {
+    width: 100%; /* Full width */
+    padding: 0.4rem; /* Smaller padding */
     font-size: 0.9em;
 }
-.form-row input[type="text"],
-.form-row textarea {
-    flex-grow: 1;
-    min-width: 50px; /* Prevent shrinking too much */
-    padding: 0.5rem; /* Consistent padding */
+.profile-form .input-with-button { /* For root folder + browse */
+    display: flex;
+    gap: 0.3em;
 }
-/* Specific smaller button within form rows (e.g., browse button) */
-.form-row button.browse-button {
-     padding: 0.5rem; /* Match input height */
+.profile-form .input-with-button input {
+    flex-grow: 1;
+}
+.profile-form button.browse-button {
+     padding: 0.4rem; /* Match input height */
      font-size: 1em;
      flex-shrink: 0;
      margin: 0;
-     line-height: 1; /* Align icon better */
+     line-height: 1;
      background-color: var(--card-bg-color);
      border-color: var(--border-color);
-     min-width: auto; /* Allow button to be smaller */
+     min-width: auto;
  }
-.form-row button.browse-button:hover {
+.profile-form button.browse-button:hover {
     background-color: var(--accent-color);
     border-color: var(--accent-color);
 }
 
-.form-actions {
-    margin-top: 1em;
-    text-align: right;
-}
-.form-actions button {
-    padding: 0.5rem 1rem; /* Standard button padding */
+/* Save status display in ProfileManager */
+.save-status {
+    font-size: 0.8em;
+    padding: 0.2em 0.5em;
+    border-radius: 3px;
     margin-left: 0.5em;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.save-status.visible {
+    opacity: 1;
+}
+.save-status.saving {
+    color: #ccc;
+    background-color: rgba(80,80,80,0.5);
+}
+.save-status.saved {
+    color: lightgreen;
+    background-color: rgba(70,150,70,0.3);
+}
+.save-status.error {
+    color: var(--danger-color);
+    background-color: rgba(150,70,70,0.3);
 }
 
 
 /* --------------------------------------------------------------------------
-   File Tree Area (Left side of main-content-split)
+   File Tree Area (in file-tree-main-content)
    -------------------------------------------------------------------------- */
-.file-tree-container {
-    width: 50%; /* Default width */
-    min-width: 300px;
+.file-tree-container { /* This class might be on a child of file-tree-main-content if FileTree has its own wrapper */
+    width: 100%; /* Takes full width of parent */
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border-right: 1px solid var(--border-secondary-color);
-    height: 100%;
+    /* border-right: 1px solid var(--border-secondary-color); REMOVED, border is on left-panel */
+    height: 100%; /* Takes full height of parent flex item */
     box-sizing: border-box;
-    flex-shrink: 0;
 }
 
 /* Search input area */
@@ -306,21 +390,20 @@ label {
     padding: 0.5em 1em;
     border-bottom: 1px solid var(--border-secondary-color);
     flex-shrink: 0;
-    display: flex; /* Added for button alignment */
-    align-items: center; /* Added */
-    gap: 0.5em; /* Added */
+    display: flex; 
+    align-items: center; 
+    gap: 0.5em; 
 }
 .search-container input {
-    flex-grow: 1; /* Take available space */
+    flex-grow: 1; 
     padding: 0.4em 0.6em;
     margin: 0;
 }
-/* Style expand/collapse/clear buttons */
 .search-container button {
-    padding: 0.4em; /* Smaller padding */
+    padding: 0.4em; 
     font-size: 0.9em;
     line-height: 1;
-    min-width: auto; /* Allow small buttons */
+    min-width: auto; 
     margin: 0;
 }
 
@@ -329,161 +412,103 @@ label {
     flex-grow: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 0.5em 0 1em 0; /* Adjusted padding */
+    padding: 0.5em 0 1em 0;
 }
 
-/* The tree list itself */
 .file-tree {
     padding: 0;
     margin: 0;
     list-style: none;
-    user-select: none; /* Prevent text selection during clicks */
+    user-select: none;
 }
-
-/* Individual tree node list item */
 .file-tree-node-li {
-    padding-left: 0 !important; /* Override potential default padding */
+    padding-left: 0 !important;
 }
-
-/* Flex container for node elements (toggle, checkbox, icon, name) */
 .file-tree-node {
     padding: 1px 0;
     display: flex;
     align-items: center;
     gap: 5px;
     cursor: default;
-    padding-left: calc(var(--node-level, 0) * 20px); /* Use CSS variable for level */
-    /* Add hover effect like PDK */
+    padding-left: calc(var(--node-level, 0) * 20px);
     border-radius: 3px;
-    margin: 1px 4px 1px 4px; /* Add horizontal margin */
+    margin: 1px 4px 1px 4px;
 }
 .file-tree-node:hover {
     background-color: rgba(255, 255, 255, 0.05);
 }
-/* Highlighted node (e.g., from keyboard navigation) */
 .file-tree-node.highlighted {
-    background-color: #444; /* Match PDK highlight */
+    background-color: #444;
 }
-
-/* Expander toggle */
 .node-toggle {
     cursor: pointer;
     width: 1em;
     text-align: center;
     flex-shrink: 0;
-    color: var(--label-text-color); /* Dim the toggle slightly */
+    color: var(--label-text-color);
     user-select: none;
 }
-.node-toggle:hover {
-    color: var(--text-color);
-}
-.node-toggle-placeholder { /* Use for files to maintain alignment */
-    display: inline-block;
-    width: 1em;
-    flex-shrink: 0;
-}
-
-/* Checkbox */
-.node-checkbox {
-    margin: 0 5px 0 0;
-    flex-shrink: 0;
-    cursor: pointer;
-    /* Style checkbox to be more visible */
-    width: 14px;
-    height: 14px;
-    accent-color: var(--accent-color); /* Color the check */
-}
-.node-checkbox-placeholder { /* Use for empty dirs */
-    display: inline-block;
-    width: 14px; /* Match checkbox */
-    height: 14px; /* Match checkbox */
-    margin: 0 5px 0 0;
-    flex-shrink: 0;
-}
-
-/* Icon */
-.node-icon {
-    margin-right: 3px;
-    flex-shrink: 0;
-    user-select: none;
-}
-
-/* Node Name Span */
-.node-name {
-    flex-grow: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    padding: 1px 3px;
-    border-radius: 2px;
-    cursor: pointer;
-    user-select: none;
-}
-
-/* Search Highlight (on name) */
-.node-name.highlight {
-    background-color: var(--highlight-background-color); /* Yellowish */
-    color: var(--highlight-text-color); /* Dark text */
-    border-radius: 2px;
-    padding: 0 2px;
-    margin: 0 -2px; /* Prevent layout shift */
-}
-
-/* Node Stats (Lines/Tokens/Time) */
-.node-stats {
-    margin-left: auto; /* Push to the right */
-    padding-left: 10px;
-    font-size: 0.8em; /* Smaller font */
-    color: #aaa;
-    white-space: nowrap;
-    flex-shrink: 0; /* Prevent wrapping */
-}
-.node-stats span { /* Individual stat items */
-    margin-left: 6px;
-}
-.node-stats .lines { color: #6ef076; } /* Green */
-.node-stats .tokens { color: #f0b76e; } /* Orange */
-.node-stats .time { color: #6ebbf0; } /* Blue */
-.node-stats .selected-count { color: #f0b76e; } /* Orange for selected count */
+.node-toggle:hover { color: var(--text-color); }
+.node-toggle-placeholder { display: inline-block; width: 1em; flex-shrink: 0; }
+.node-checkbox { margin: 0 5px 0 0; flex-shrink: 0; cursor: pointer; width: 14px; height: 14px; accent-color: var(--accent-color); }
+.node-checkbox-placeholder { display: inline-block; width: 14px; height: 14px; margin: 0 5px 0 0; flex-shrink: 0; }
+.node-icon { margin-right: 3px; flex-shrink: 0; user-select: none; }
+.node-name { flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 1px 3px; border-radius: 2px; cursor: pointer; user-select: none; }
+.node-name.highlight { background-color: var(--highlight-background-color); color: var(--highlight-text-color); border-radius: 2px; padding: 0 2px; margin: 0 -2px; }
+.node-stats { margin-left: auto; padding-left: 10px; font-size: 0.8em; color: #aaa; white-space: nowrap; flex-shrink: 0; }
+.node-stats span { margin-left: 6px; }
+.node-stats .lines { color: #6ef076; }
+.node-stats .tokens { color: #f0b76e; }
+.node-stats .time { color: #6ebbf0; }
+.node-stats .selected-count { color: #f0b76e; }
 
 
 /* --------------------------------------------------------------------------
-   Aggregator Panel (Right side of main-content-split)
+   Aggregator Panel (in Left Panel)
    -------------------------------------------------------------------------- */
-.right-panel-container {
-    flex: 1;
+/* .right-panel-container styling from original App.css is effectively applied to .left-panel-aggregator now */
+.left-panel-aggregator {
+    /* flex: 1; This is set on .left-panel-aggregator itself */
     display: flex;
     flex-direction: column;
-    overflow: auto;
-    padding: 1em;
-    height: 100%;
+    /* overflow: auto; Handled by children now or specific elements like textarea */
+    /* padding: 1em; Set by .left-panel > div */
+    height: 100%; /* Crucial for textarea to fill space */
     box-sizing: border-box;
-    gap: 0.5em; /* Space between header, textarea, actions */
+    gap: 0.5em;
 }
 
-/* Panel header with title and stats */
 .aggregator-header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column; /* Stack title and controls */
+    gap: 0.5em;
+    align-items: flex-start; /* Align items to the start */
     flex-shrink: 0;
     padding-bottom: 0.5em;
     border-bottom: 1px solid var(--border-secondary-color);
 }
 .aggregator-header h3 {
     margin: 0;
+    font-size: 1.1em;
+}
+.aggregator-controls { /* Wrapper for format select, prepend checkbox, and stats */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.8em; /* Spacing between control groups */
+    width: 100%; /* Take full width */
 }
 .aggregator-header span { /* Style for token count etc */
     font-size: 0.9em;
     color: var(--label-text-color);
+    margin-left: auto; /* Push stats to the right if on same line */
 }
 
-/* Text area for aggregated content */
 .aggregator-content {
-    flex-grow: 1;
+    flex-grow: 1; /* Take all available vertical space */
     width: 100%;
     box-sizing: border-box;
-    background-color: var(--background-secondary-color);
+    background-color: var(--input-background-color); /* Match input bg */
     color: var(--text-color);
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -492,15 +517,13 @@ label {
     overflow: auto;
     resize: none;
     font-family: monospace;
-    white-space: pre; /* Preserve whitespace */
+    white-space: pre; 
 }
-/* Add placeholder styling */
 .aggregator-content::placeholder {
     color: #888;
     font-style: italic;
 }
 
-/* Container for aggregator action buttons */
 .aggregator-actions {
     text-align: right;
     margin-top: 0.5em;
@@ -508,12 +531,7 @@ label {
 }
 .aggregator-actions button {
     margin-left: 0.5em;
-    padding: 0.5rem 1rem; /* Standard button padding */
-}
-.aggregator-actions .copy-feedback { /* Style for 'Copied!' text */
-    color: limegreen;
-    margin-left: 0.5em;
-    font-size: 0.9em;
+    padding: 0.5rem 1rem;
 }
 
 
@@ -523,26 +541,19 @@ label {
 .status-bar {
   --status-bar-height: 30px;
   height: var(--status-bar-height);
-  background-color: #222; /* PDK bottom bar color */
-  border-top: 1px solid var(--border-color); /* PDK border */
+  background-color: #222;
+  border-top: 1px solid var(--border-color);
   padding: 0 1em;
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-size: 0.85em;
-  color: #ccc; /* PDK text color */
+  color: #ccc;
   flex-shrink: 0;
   box-sizing: border-box;
 }
-.status-bar-left, .status-bar-right {
-  display: flex;
-  gap: 1em;
-  align-items: center;
-}
-.status-bar span {
-  white-space: nowrap;
-}
-/* Color coding for stats (optional, matches PDK examples) */
+.status-bar-left, .status-bar-right { display: flex; gap: 1em; align-items: center; }
+.status-bar span { white-space: nowrap; }
 .status-bar .stat-files { color: #6ef076; }
 .status-bar .stat-folders { color: #f0b76e; }
 .status-bar .stat-lines { color: #6ef076; }
@@ -553,156 +564,74 @@ label {
 /* ==========================================================================
    Modals & Overlays
    ========================================================================== */
+.scan-overlay { position: fixed; inset: 0; background-color: var(--overlay-background-color); display: flex; align-items: center; justify-content: center; z-index: 1000; color: var(--text-color); }
+.scan-indicator { background-color: var(--card-bg-color); padding: 2em; border-radius: 8px; border: 1px solid var(--border-color); text-align: center; min-width: 300px; box-shadow: 0 5px 15px var(--modal-shadow-color); }
+.scan-indicator h3 { margin-top: 0; margin-bottom: 1em; font-weight: 500; }
+.scan-indicator progress { width: 100%; margin-bottom: 0.5em; height: 8px; accent-color: limegreen; }
+.scan-indicator progress::-webkit-progress-bar { background-color: #555; border-radius: 4px; }
+.scan-indicator progress::-webkit-progress-value { background-color: limegreen; border-radius: 4px; transition: width 0.2s ease-in-out; }
+.scan-indicator progress::-moz-progress-bar { background-color: limegreen; border-radius: 4px; }
+.scan-path { font-size: 0.8em; color: var(--label-text-color); margin-top: 0.5em; margin-bottom: 1em; max-width: 400px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: ltr; }
+.scan-indicator button { margin-top: 1em; padding: 0.5rem 1rem; }
 
-/* --------------------------------------------------------------------------
-   Scan Progress Overlay
-   -------------------------------------------------------------------------- */
-.scan-overlay {
-    position: fixed;
-    inset: 0;
-    background-color: var(--overlay-background-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    color: var(--text-color);
+/* --- File Viewer Modal --- */
+.file-viewer-modal-overlay { position: fixed; inset: 0; background-color: var(--overlay-background-color); display: flex; align-items: center; justify-content: center; z-index: 1050; }
+.file-viewer-modal-content { background-color: var(--background-tertiary-color); padding: 1em; border-radius: 8px; border: 1px solid var(--border-color); width: 80%; max-width: 1000px; height: 80%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 5px 15px var(--modal-shadow-color); }
+.file-viewer-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8em; flex-shrink: 0; border-bottom: 1px solid var(--border-secondary-color); padding-bottom: 0.5em; }
+.file-viewer-modal-header h4 { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.1em; }
+.file-viewer-modal-header button { padding: 0.3em 0.8em; background-color: var(--card-bg-color); border: 1px solid var(--border-color); margin: 0; }
+.file-viewer-modal-header button:hover { background-color: var(--accent-color); border-color: var(--accent-color); }
+.file-viewer-modal-body { flex-grow: 1; overflow: auto; background-color: var(--background-secondary-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.8em; font-family: monospace; white-space: pre; font-size: 0.9em; color: var(--text-color); }
+.file-viewer-modal-body p { padding: 1em; text-align: center; white-space: pre-wrap; color: #aaa; font-style: italic; }
+.file-viewer-modal-body pre { margin: 0; }
+
+/* --- Hotkeys Modal --- */
+.hotkeys-modal-overlay { position: fixed; inset: 0; background-color: var(--overlay-background-color); display: flex; align-items: center; justify-content: center; z-index: 1060; } /* Higher z-index than file viewer */
+.hotkeys-modal-content { background-color: var(--background-tertiary-color); padding: 1.5em; border-radius: 8px; border: 1px solid var(--border-color); width: auto; min-width: 400px; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 5px 15px var(--modal-shadow-color); }
+.hotkeys-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em; flex-shrink: 0; border-bottom: 1px solid var(--border-secondary-color); padding-bottom: 0.8em; }
+.hotkeys-modal-header h4 { margin: 0; font-size: 1.2em; }
+.hotkeys-modal-header button { padding: 0.3em 0.8em; background-color: var(--card-bg-color); border: 1px solid var(--border-color); margin: 0; }
+.hotkeys-modal-header button:hover { background-color: var(--accent-color); border-color: var(--accent-color); }
+.hotkeys-modal-body { flex-grow: 1; overflow-y: auto; font-size: 0.95em; padding-right: 0.5em; /* Space for scrollbar */ }
+.hotkeys-modal-body ul { list-style: none; padding-left: 0; margin: 0; }
+.hotkeys-modal-body li { margin-bottom: 0.7em; line-height: 1.4; }
+.hotkeys-modal-body ul ul { padding-left: 1.5em; margin-top: 0.5em; } /* Nested list styling */
+.hotkeys-modal-body hr { border: none; border-top: 1px solid var(--border-secondary-color); margin: 1em 0; }
+.hotkeys-modal-body kbd {
+  background-color: #383838; /* Slightly different from input for distinction */
+  border: 1px solid #555;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0.2em 0.5em;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-size: 0.9em;
+  box-shadow: 0 1px 1px rgba(0,0,0,0.15);
+  margin: 0 0.15em;
+  white-space: nowrap;
+  color: var(--input-text-color);
 }
-.scan-indicator {
-    background-color: var(--card-bg-color); /* Use card background */
-    padding: 2em;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    text-align: center;
-    min-width: 300px;
-    box-shadow: 0 5px 15px var(--modal-shadow-color);
-}
-.scan-indicator h3 {
-    margin-top: 0;
-    margin-bottom: 1em;
-    font-weight: 500;
-}
-.scan-indicator progress {
-    width: 100%;
-    margin-bottom: 0.5em;
-    height: 8px;
-    accent-color: limegreen; /* Style the progress bar */
-}
-.scan-indicator progress::-webkit-progress-bar {
-   background-color: #555;
-   border-radius: 4px;
-}
-.scan-indicator progress::-webkit-progress-value {
-   background-color: limegreen;
-   border-radius: 4px;
-   transition: width 0.2s ease-in-out;
-}
-.scan-indicator progress::-moz-progress-bar {
-    background-color: limegreen;
-    border-radius: 4px;
-}
-.scan-path {
-    font-size: 0.8em;
+.hotkeys-modal-body small {
     color: var(--label-text-color);
-    margin-top: 0.5em;
-    margin-bottom: 1em;
-    max-width: 400px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    direction: ltr; /* Ensure ellipsis at end */
+    font-size: 0.9em;
+    display: inline-block; /* Or block with margin if needed */
+    margin-left: 0.5em;
 }
-.scan-indicator button { /* Style cancel button */
-    margin-top: 1em;
-    padding: 0.5rem 1rem;
+.hotkeys-modal-body i { /* For italicized context notes like (File Tree focused) */
+    color: var(--label-text-color);
+    font-size: 0.9em;
+    margin-left: 0.3em;
 }
 
-/* --------------------------------------------------------------------------
-   File Viewer Modal
-   -------------------------------------------------------------------------- */
-.file-viewer-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background-color: var(--overlay-background-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1050;
-}
-.file-viewer-modal-content {
-    background-color: var(--background-tertiary-color); /* Modal background */
-    padding: 1em;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    width: 80%;
-    max-width: 1000px;
-    height: 80%;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 5px 15px var(--modal-shadow-color);
-}
-.file-viewer-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.8em; /* More space */
-    flex-shrink: 0;
-    border-bottom: 1px solid var(--border-secondary-color); /* Add separator */
-    padding-bottom: 0.5em;
-}
-.file-viewer-modal-header h4 {
-    margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 1.1em; /* Slightly larger title */
-}
-.file-viewer-modal-header button { /* Style close button */
-    padding: 0.3em 0.8em;
-    background-color: var(--card-bg-color); /* Match other buttons */
-    border: 1px solid var(--border-color);
-    margin: 0;
-}
-.file-viewer-modal-header button:hover {
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
-}
-.file-viewer-modal-body {
-    flex-grow: 1;
-    overflow: auto;
-    background-color: var(--background-secondary-color); /* Code area background */
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    padding: 0.8em; /* More padding */
-    font-family: monospace;
-    white-space: pre;
-    font-size: 0.9em;
-    color: var(--text-color);
-}
-.file-viewer-modal-body p { /* Styling for loading/error messages */
-    padding: 1em;
-    text-align: center;
-    white-space: pre-wrap;
-    color: #aaa; /* Dimmer text */
-    font-style: italic;
-}
-.file-viewer-modal-body pre {
-    margin: 0;
-}
 
 /* Utility Styles */
-.flex-row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
+.flex-row { display: flex; align-items: center; gap: 1rem; }
 .mt-1 { margin-top: 0.5rem; }
 .mt-2 { margin-top: 1rem; }
 .mb-1 { margin-bottom: 0.5rem; }
 .mb-2 { margin-bottom: 1rem; }
 
 
-/* Light Theme Overrides - Remove if not needed or adjust vars */
+/* Light Theme Overrides */
 @media (prefers-color-scheme: light) {
   :root {
     --bg-color: #ffffff;
@@ -714,7 +643,8 @@ label {
     --card-bg-color: #f8f8f8;
     --card-bg-color2: #f0f0f0;
     --danger-color: #d33;
-    --sidebar-bg-color: #e8f0f4;
+    /* --sidebar-bg-color: #e8f0f4; */
+    --left-panel-bg-color: #f0f4f8; /* Lighter for left panel */
     --background-color: #ffffff;
     --background-secondary-color: #f8f8f8;
     --background-tertiary-color: #fdfdfd;
@@ -724,40 +654,27 @@ label {
     --input-background-color: #eee;
     --input-text-color: #222;
     --label-text-color: #555;
-    --highlight-background-color: #fff380; /* Light yellow */
+    --highlight-background-color: #fff380;
     --highlight-text-color: #333;
     --overlay-background-color: rgba(255, 255, 255, 0.7);
     --modal-shadow-color: rgba(0, 0, 0, 0.1);
   }
 
-  button {
-    background-color: #f9f9f9;
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
-  }
-  button:hover {
-    background-color: var(--accent-color);
-    color: #fff; /* Text white on accent hover */
-    border-color: var(--accent-color);
-  }
-   button.delete-btn {
-     background-color: var(--danger-color);
-     border-color: var(--danger-color);
-     color: #fff;
-   }
-   button.delete-btn:hover {
-     background-color: #b00;
-     border-color: #b00;
-   }
-   button:disabled {
-     background-color: #e0e0e0;
-     border-color: #d0d0d0;
-     color: #999;
-   }
+  button { background-color: #f9f9f9; color: var(--text-color); border: 1px solid var(--border-color); }
+  button:hover { background-color: var(--accent-color); color: #fff; border-color: var(--accent-color); }
+  button.delete-btn { background-color: var(--danger-color); border-color: var(--danger-color); color: #fff; }
+  button.delete-btn:hover { background-color: #b00; border-color: #b00; }
+  button:disabled { background-color: #e0e0e0; border-color: #d0d0d0; color: #999; }
 
-  .sidebar { border-right-color: var(--border-color); background-color: var(--sidebar-bg-color); }
-  .file-tree-container { border-right-color: var(--border-secondary-color); }
-  .aggregator-content { background-color: var(--background-secondary-color); border-color: var(--border-color); }
+  .left-panel { border-right-color: var(--border-color); background-color: var(--left-panel-bg-color); }
+  .left-panel-profile-manager { border-bottom-color: var(--border-color); }
+  .file-tree-main-content { background-color: var(--background-color); }
+  .file-tree-header { border-bottom-color: var(--border-secondary-color); }
+  .hotkeys-help-btn { color: var(--label-text-color); }
+  .hotkeys-help-btn:hover { background-color: var(--card-bg-color); border-color: var(--border-color); color: var(--text-color); }
+
+
+  .aggregator-content { background-color: var(--input-background-color); border-color: var(--border-color); color: var(--text-color); }
   .profile-form { border-color: var(--border-color); background-color: var(--card-bg-color2); }
   .search-container { border-bottom-color: var(--border-secondary-color); }
   .aggregator-header { border-bottom-color: var(--border-secondary-color); }
@@ -770,7 +687,7 @@ label {
   .scan-overlay { color: #333; }
   .scan-indicator { background-color: var(--background-tertiary-color); border: 1px solid var(--border-color); }
   .scan-path { color: var(--label-text-color); }
-  .scan-indicator progress { accent-color: #4caf50; } /* Green progress bar */
+  .scan-indicator progress { accent-color: #4caf50; }
   .scan-indicator progress::-webkit-progress-value { background-color: #4caf50; }
   .scan-indicator progress::-moz-progress-bar { background-color: #4caf50; }
 
@@ -779,4 +696,24 @@ label {
   .file-viewer-modal-header button:hover { background-color: #ccc; }
   .file-viewer-modal-body { background-color: var(--background-color); border-color: var(--border-color); color: var(--text-color); }
   .file-viewer-modal-body p { color: #777; }
+
+  .hotkeys-modal-content { background-color: var(--background-tertiary-color); border: 1px solid var(--border-color); }
+  .hotkeys-modal-header { border-bottom-color: var(--border-secondary-color); }
+  .hotkeys-modal-header button { background-color: #ddd; color: #333; border-color: #ccc; }
+  .hotkeys-modal-header button:hover { background-color: #ccc; }
+  .hotkeys-modal-body { color: var(--text-color); }
+  .hotkeys-modal-body kbd {
+    background-color: #eaeaea;
+    border-color: #bdbdbd;
+    color: #222;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+  }
+  .hotkeys-modal-body small { color: var(--label-text-color); }
+  .hotkeys-modal-body i { color: var(--label-text-color); }
+  .hotkeys-modal-body hr { border-top-color: var(--border-secondary-color); }
+
+
+  .save-status.saving { color: #555; background-color: rgba(180,180,180,0.5); }
+  .save-status.saved { color: darkgreen; background-color: rgba(150,230,150,0.3); }
+  .save-status.error { color: var(--danger-color); background-color: rgba(230,150,150,0.3); }
 }
