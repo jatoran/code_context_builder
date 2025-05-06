@@ -1,8 +1,9 @@
 
 
 
+
 // src/hooks/useAggregator.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react'; // Added useRef
 import { invoke } from '@tauri-apps/api/core';
 import { FileNode } from '../types/scanner';
 import {
@@ -90,6 +91,8 @@ const collectFilePathsForAggregation = (
 
 
 export function useAggregator({ treeData, selectedPaths, selectedProfileId }: UseAggregatorProps): UseAggregatorReturn {
+    const isMountedRef = useRef(true); // For mounted check within the hook
+
     const [aggregatedText, setAggregatedText] = useState<string>('');
     const [tokenCount, setTokenCount] = useState<number>(0);
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -100,30 +103,45 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
     const [currentPrependFileTree, setCurrentPrependFileTree] = useState<boolean>(false);
 
     useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []); // Runs once when the hook is used by a component
+
+    useEffect(() => {
         if (selectedProfileId && selectedProfileId > 0) {
             try {
                 const storedSettingsRaw = localStorage.getItem(`ccb_agg_settings_${selectedProfileId}`);
                 if (storedSettingsRaw) {
                     const settings: AggregatorSettings = JSON.parse(storedSettingsRaw);
-                    setCurrentSelectedFormat(settings.format && ['markdown', 'xml', 'raw'].includes(settings.format) ? settings.format : 'markdown');
-                    setCurrentPrependFileTree(typeof settings.prependTree === 'boolean' ? settings.prependTree : false);
+                    if (isMountedRef.current) {
+                        setCurrentSelectedFormat(settings.format && ['markdown', 'xml', 'raw'].includes(settings.format) ? settings.format : 'markdown');
+                        setCurrentPrependFileTree(typeof settings.prependTree === 'boolean' ? settings.prependTree : false);
+                    }
                 } else {
-                    setCurrentSelectedFormat('markdown');
-                    setCurrentPrependFileTree(false);
+                     if (isMountedRef.current) {
+                        setCurrentSelectedFormat('markdown');
+                        setCurrentPrependFileTree(false);
+                     }
                 }
             } catch (e) {
                 console.error("Failed to parse aggregator settings from localStorage for profile " + selectedProfileId, e);
+                if (isMountedRef.current) {
+                    setCurrentSelectedFormat('markdown');
+                    setCurrentPrependFileTree(false);
+                }
+            }
+        } else {
+            if (isMountedRef.current) {
                 setCurrentSelectedFormat('markdown');
                 setCurrentPrependFileTree(false);
             }
-        } else {
-            setCurrentSelectedFormat('markdown');
-            setCurrentPrependFileTree(false);
         }
     }, [selectedProfileId]);
 
     const handleSetSelectedFormat = useCallback((format: OutputFormat) => {
-        setCurrentSelectedFormat(format);
+        if (isMountedRef.current) setCurrentSelectedFormat(format);
         if (selectedProfileId && selectedProfileId > 0) {
             const newSettings: AggregatorSettings = { format, prependTree: currentPrependFileTree };
             try {
@@ -133,7 +151,7 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
     }, [selectedProfileId, currentPrependFileTree]);
 
     const handleSetPrependFileTree = useCallback((prepend: boolean) => {
-        setCurrentPrependFileTree(prepend);
+        if (isMountedRef.current) setCurrentPrependFileTree(prepend);
         if (selectedProfileId && selectedProfileId > 0) {
             const newSettings: AggregatorSettings = { format: currentSelectedFormat, prependTree: prepend };
             try {
@@ -193,20 +211,24 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
             }
         }
         return builtContent;
-    }, [selectedPaths]); // selectedPaths dependency is still relevant for filtering `relevantChildren`
+    }, [selectedPaths]); 
 
     const generateAggregatedText = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        setCopySuccess(false);
+        if (isMountedRef.current) {
+            setIsLoading(true);
+            setError(null);
+            setCopySuccess(false);
+        }
         let textForPrependedTree = '';
         let aggregatedCoreContent = '';
         let fileContentsMap: BatchFileContentsResponse = {};
 
         if (!treeData) {
-            setAggregatedText('');
-            setTokenCount(0);
-            setIsLoading(false);
+            if (isMountedRef.current) {
+                setAggregatedText('');
+                setTokenCount(0);
+                setIsLoading(false);
+            }
             return;
         }
 
@@ -218,14 +240,12 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
             textForPrependedTree = generateFullScannedFileTree(treeData, formatToUse);
         }
 
-        // 1. Collect all file paths to fetch
         const pathsToFetchSet = new Set<string>();
         if (selectedPaths.size > 0) {
              collectFilePathsForAggregation(treeData, selectedPaths, pathsToFetchSet);
         }
         const uniquePathsToFetch = Array.from(pathsToFetchSet);
 
-        // 2. Fetch contents in batch if there are paths
         if (uniquePathsToFetch.length > 0) {
             try {
                 console.log(`[Aggregator] Fetching content for ${uniquePathsToFetch.length} files in batch.`);
@@ -233,17 +253,17 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
             } catch (batchError) {
                 const errMsg = batchError instanceof Error ? batchError.message : String(batchError);
                 console.error("Error invoking read_multiple_file_contents:", errMsg);
-                setError(`Failed to fetch file contents: ${errMsg}`);
-                // Populate map with errors for all paths attempted
+                if (isMountedRef.current) setError(`Failed to fetch file contents: ${errMsg}`);
                 uniquePathsToFetch.forEach(p => {
-                    if (!fileContentsMap[p]) { // Avoid overwriting if some partial results came back before a general invoke error
+                    if (!fileContentsMap[p]) { 
                         fileContentsMap[p] = { Err: `Batch read command failed: ${errMsg}` };
                     }
                 });
             }
         }
+        
+        if (!isMountedRef.current) return; // Check before proceeding with content building
 
-        // 3. Build the aggregated content using the fetched map
         if (selectedPaths.size > 0) {
             if (treeData.is_dir) {
                 let rootLevelDepth = 1;
@@ -254,11 +274,10 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
                     aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth + 1, formatToUse, profileRootAbsolutePath, fileContentsMap);
                     aggregatedCoreContent += formatFolderFooter(formatToUse, rootLevelDepth);
                 } else {
-                    // This case might imply treeData itself is not a relevant container but its children might be (if treeData is root)
                     aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth, formatToUse, profileRootAbsolutePath, fileContentsMap);
                 }
 
-            } else if (selectedPaths.has(treeData.path)) { // Root is a single selected file
+            } else if (selectedPaths.has(treeData.path)) { 
                 const lang = getLanguageFromPath(treeData.path);
                 const fileResult = fileContentsMap[treeData.path];
                 let fileContentText: string;
@@ -288,40 +307,45 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
             finalOutput += '\n';
         }
 
-        setAggregatedText(finalOutput);
+        if (isMountedRef.current) setAggregatedText(finalOutput);
 
         if (finalOutput) {
             try {
                 const count = await invoke<number>("get_text_token_count", { text: finalOutput });
-                setTokenCount(count);
+                if (isMountedRef.current) setTokenCount(count);
             } catch (tokenError) {
                 console.error("Failed to get token count:", tokenError);
-                setTokenCount(0);
-                const err = tokenError instanceof Error ? tokenError.message : String(tokenError);
-                setError(prev => (prev ? prev + "\n" : "") + `Token count failed: ${err}`);
+                if (isMountedRef.current) {
+                    setTokenCount(0);
+                    const err = tokenError instanceof Error ? tokenError.message : String(tokenError);
+                    setError(prev => (prev ? prev + "\n" : "") + `Token count failed: ${err}`);
+                }
             }
         } else {
-            setTokenCount(0);
+            if (isMountedRef.current) setTokenCount(0);
         }
 
-        setIsLoading(false);
+        if (isMountedRef.current) setIsLoading(false);
     }, [treeData, selectedPaths, currentSelectedFormat, currentPrependFileTree, buildAggregatedContentRecursive]);
 
     useEffect(() => {
-        generateAggregatedText();
-    }, [generateAggregatedText]); // generateAggregatedText itself depends on selectedPaths, treeData, etc.
+        generateAggregatedText().catch(err => {
+            console.error("Error in generateAggregatedText effect:", err);
+            if(isMountedRef.current) setError(`Aggregation failed: ${err instanceof Error ? err.message : String(err)}`);
+        });
+    }, [generateAggregatedText]);
 
     const handleCopyToClipboard = useCallback(async () => {
         if (!aggregatedText || isLoading) return;
         try {
             await navigator.clipboard.writeText(aggregatedText);
-            setCopySuccess(true);
+            if (isMountedRef.current) setCopySuccess(true);
             window.dispatchEvent(new CustomEvent('global-copy-success'));
-            setTimeout(() => setCopySuccess(false), 1500);
+            setTimeout(() => { if (isMountedRef.current) setCopySuccess(false); }, 1500);
         } catch (err) {
             console.error("Failed to copy to clipboard:", err);
             const errorMsg = err instanceof Error ? err.message : String(err);
-            setError(`Failed to copy: ${errorMsg}`);
+            if (isMountedRef.current) setError(`Failed to copy: ${errorMsg}`);
             alert("Failed to copy text. See console for details.");
         }
     }, [aggregatedText, isLoading]);

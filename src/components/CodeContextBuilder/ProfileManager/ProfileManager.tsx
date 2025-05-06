@@ -52,6 +52,18 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
   const [showSettings, setShowSettings] = useState<boolean>(() => safeGetItem('ccb_showProfileSettings', true));
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const saveTimeoutRef = useRef<number | null>(null);
+  const isMountedRef = useRef(true); // For mounted check
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+        isMountedRef.current = false;
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+    };
+  }, []);
+
 
   useEffect(() => {
       safeSetItem('ccb_showProfileSettings', showSettings);
@@ -66,15 +78,18 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    setSaveStatus('saving');
+    if (isMountedRef.current) setSaveStatus('saving');
+
     saveTimeoutRef.current = window.setTimeout(async () => {
       const result = await onSaveProfile();
+      if (!isMountedRef.current) return;
+
       if (result === 'saved') {
         setSaveStatus('saved');
-        setTimeout(() => setSaveStatus('idle'), 1500);
+        setTimeout(() => { if (isMountedRef.current) setSaveStatus('idle'); }, 1500);
       } else {
         setSaveStatus('error');
-        setTimeout(() => setSaveStatus('idle'), 3000);
+        setTimeout(() => { if (isMountedRef.current) setSaveStatus('idle'); }, 3000);
       }
     }, 750); 
   }, [onSaveProfile, profileSelected]);
@@ -83,11 +98,7 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
     if (profileSelected && !isScanning) { 
       triggerAutoSave();
     }
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
+    // Cleanup for this effect is handled by the main unmount effect for saveTimeoutRef
   }, [profileTitle, rootFolder, ignoreText, profileSelected, isScanning, triggerAutoSave]);
 
 

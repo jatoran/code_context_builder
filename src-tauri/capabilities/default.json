@@ -12,6 +12,7 @@
     "core:window:allow-set-position",
     "core:window:allow-show",
     "core:window:allow-available-monitors",
+    "core:window:allow-set-focus",
     "dialog:default"
   ]
 }
