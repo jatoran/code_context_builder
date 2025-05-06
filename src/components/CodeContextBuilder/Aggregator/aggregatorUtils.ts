@@ -101,38 +101,38 @@ function isNodeOrDescendantFileSelected(node: FileNode, selectedPaths: Set<strin
     return false;
 }
 
-function buildMarkdownTreeRecursive(
-    node: FileNode,
-    selectedPaths: Set<string>,
-    lines: string[],
-    prefix: string
-): void {
-    if (!isNodeOrDescendantFileSelected(node, selectedPaths)) {
-        return;
-    }
+// function buildMarkdownTreeRecursive(
+//     node: FileNode,
+//     selectedPaths: Set<string>,
+//     lines: string[],
+//     prefix: string
+// ): void {
+//     if (!isNodeOrDescendantFileSelected(node, selectedPaths)) {
+//         return;
+//     }
 
-    lines.push(`${prefix}${node.is_dir ? '📁' : '📄'} ${escapeXml(node.name)}${node.is_dir ? '/' : ''}`);
+//     lines.push(`${prefix}${node.is_dir ? '📁' : '📄'} ${escapeXml(node.name)}${node.is_dir ? '/' : ''}`);
 
-    if (node.is_dir && node.children) {
-        const relevantChildren = node.children.filter(child => isNodeOrDescendantFileSelected(child, selectedPaths));
-        relevantChildren.sort((a,b) => { // Files first, then dirs, then alpha
-            if (!a.is_dir && b.is_dir) return -1;
-            if (a.is_dir && !b.is_dir) return 1;
-            return a.name.localeCompare(b.name);
-        });
+//     if (node.is_dir && node.children) {
+//         const relevantChildren = node.children.filter(child => isNodeOrDescendantFileSelected(child, selectedPaths));
+//         relevantChildren.sort((a,b) => { // Files first, then dirs, then alpha
+//             if (!a.is_dir && b.is_dir) return -1;
+//             if (a.is_dir && !b.is_dir) return 1;
+//             return a.name.localeCompare(b.name);
+//         });
 
-        relevantChildren.forEach((child, index) => {
-            const isLast = index === relevantChildren.length - 1;
-            const newPrefix = prefix + (isLast ? '    └── ' : '    ├── ');
-            // This prefix logic is for a more traditional tree. The plan's example is simpler.
-            // Let's adjust to the plan's example:
-            // └── root/
-            //     ├── file.txt
-            //     └── sub/
-            // For this, we need to pass depth for simple indentation.
-        });
-    }
-}
+//         // relevantChildren.forEach((child, index) => {
+//             // const isLast = index === relevantChildren.length - 1;
+//             // const newPrefix = prefix + (isLast ? '    └── ' : '    ├── ');
+//             // This prefix logic is for a more traditional tree. The plan's example is simpler.
+//             // Let's adjust to the plan's example:
+//             // └── root/
+//             //     ├── file.txt
+//             //     └── sub/
+//             // For this, we need to pass depth for simple indentation.
+//         // });
+//     }
+// }
 
 
 function buildFormattedTreeRecursiveInternal(

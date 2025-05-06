@@ -3,6 +3,7 @@
 import { FileNode } from '../../../types/scanner';
 
 // Helper to get all descendant file paths
+// Helper to get all descendant file paths
 export const getAllDescendantFilePaths = (node: FileNode | null): string[] => {
     if (!node) return [];
     let paths: string[] = [];
@@ -96,4 +97,38 @@ export const getNodeDepth = (rootNode: FileNode, path: string): number | null =>
         return null;
     };
     return findDepthRecursive(rootNode, path, 0);
+};
+
+export interface DescendantStats {
+    totalFiles: number;
+    totalLines: number;
+    totalTokens: number;
+}
+
+// New helper to get aggregated stats for all descendant files of a directory node
+export const getDescendantFileStats = (node: FileNode): DescendantStats => {
+    let stats: DescendantStats = { totalFiles: 0, totalLines: 0, totalTokens: 0 };
+    if (!node.is_dir) {
+        return stats; // Should only be called on directories
+    }
+
+    function traverse(currentNode: FileNode) {
+        if (!currentNode.is_dir) {
+            stats.totalFiles++;
+            stats.totalLines += currentNode.lines;
+            stats.totalTokens += currentNode.tokens;
+        }
+        if (currentNode.children) {
+            for (const child of currentNode.children) {
+                traverse(child);
+            }
+        }
+    }
+
+    if (node.children) {
+        for (const child of node.children) {
+            traverse(child);
+        }
+    }
+    return stats;
 };

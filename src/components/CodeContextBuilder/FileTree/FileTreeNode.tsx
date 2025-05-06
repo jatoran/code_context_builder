@@ -6,7 +6,9 @@ import { FileNode } from '../../../types/scanner';
 import {
     getAllDescendantFilePaths,
     nodeOrDescendantMatches,
-    formatTimeAgo
+    formatTimeAgo,
+    getDescendantFileStats, // Added import
+    DescendantStats // Added import for type
 } from './fileTreeUtils';
 
 interface FileTreeNodeProps {
@@ -19,7 +21,7 @@ interface FileTreeNodeProps {
     expandedPaths: Set<string>;
     onToggleExpand: (path: string) => void;
     highlightedPath?: string;
-    outOfDateFilePaths: Set<string>; // New prop
+    outOfDateFilePaths: Set<string>; 
 }
 
 const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
@@ -32,7 +34,7 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
     expandedPaths,
     onToggleExpand,
     highlightedPath,
-    outOfDateFilePaths, // Destructure new prop
+    outOfDateFilePaths, 
 }) => {
 
      const lowerSearchTerm = searchTerm.toLowerCase();
@@ -73,39 +75,50 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
         }
     }, [node.path, node.is_dir, onToggleSelection, onViewFile]);
     
+    const descendantFilePaths = useMemo(() => {
+        if (node.is_dir) {
+            return getAllDescendantFilePaths(node);
+        }
+        return [];
+    }, [node]);
+
+    const selectedDescendantCount = useMemo(() => {
+        if (!node.is_dir) return 0;
+        return descendantFilePaths.filter(p => selectedPaths.has(p)).length;
+    }, [node.is_dir, descendantFilePaths, selectedPaths]);
+
     const checkboxState = useMemo(() => {
         if (!node.is_dir) {
             return selectedPaths.has(node.path) ? 'checked' : 'unchecked';
         }
-        const descendantFiles = getAllDescendantFilePaths(node);
-        const totalDescendantFiles = descendantFiles.length;
+        
+        const totalDescendantFiles = descendantFilePaths.length;
 
         if (totalDescendantFiles === 0) return 'none'; 
-
-        let selectedDescendantCount = 0;
-        for (const filePath of descendantFiles) {
-            if (selectedPaths.has(filePath)) {
-                selectedDescendantCount++;
-            }
-        }
 
         if (selectedDescendantCount === 0) return 'unchecked';
         if (selectedDescendantCount === totalDescendantFiles) return 'checked';
         return 'indeterminate';
 
-    }, [node, selectedPaths]); 
+    }, [node, selectedPaths, descendantFilePaths, selectedDescendantCount]); 
 
-    // --- Stale File Indication ---
+    const folderStats: DescendantStats | null = useMemo(() => {
+        if (node.is_dir && isOpen) { // Calculate only for open directories
+            return getDescendantFileStats(node);
+        }
+        return null;
+    }, [node, isOpen]);
+
     const isNodeStale = useMemo(() => 
         !node.is_dir && outOfDateFilePaths.has(node.path),
     [node, outOfDateFilePaths]);
 
     const hasStaleDescendants = useMemo(() => {
-        if (!node.is_dir || !isOpen) return false; // Only check for open directories
-        const descendantFiles = getAllDescendantFilePaths(node);
-        return descendantFiles.some(path => outOfDateFilePaths.has(path));
-    }, [node, isOpen, outOfDateFilePaths]);
-    // --- End Stale File Indication ---
+        if (!node.is_dir || !isOpen) return false; 
+        // Optimization: use pre-calculated descendantFilePaths if available, otherwise re-calculate
+        const filesToCheck = descendantFilePaths.length > 0 ? descendantFilePaths : getAllDescendantFilePaths(node);
+        return filesToCheck.some(path => outOfDateFilePaths.has(path));
+    }, [node, isOpen, outOfDateFilePaths, descendantFilePaths]);
 
     if (searchTerm && !isVisible) {
         return null;
@@ -163,9 +176,15 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                           {node.last_modified && <span className="time">{formatTimeAgo(node.last_modified)}</span>}
                         </>
                     )}
-                     {node.is_dir && checkboxState === 'indeterminate' && (
+                     {node.is_dir && folderStats && folderStats.totalFiles > 0 && (
+                        <>
+                            {folderStats.totalLines > 0 && <span className="folder-total-lines lines">{folderStats.totalLines.toLocaleString()}L</span>}
+                            {folderStats.totalTokens > 0 && <span className="folder-total-tokens tokens">~{folderStats.totalTokens.toLocaleString()}T</span>}
+                        </>
+                     )}
+                     {node.is_dir && checkboxState !== 'none' && descendantFilePaths.length > 0 && (
                          <span className="selected-count">
-                             ({getAllDescendantFilePaths(node).filter(p => selectedPaths.has(p)).length} sel.)
+                             ({selectedDescendantCount}/{descendantFilePaths.length} sel.)
                          </span>
                      )}
                 </span>
@@ -186,7 +205,7 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                                 expandedPaths={expandedPaths}
                                 onToggleExpand={onToggleExpand}
                                 highlightedPath={highlightedPath}
-                                outOfDateFilePaths={outOfDateFilePaths} // Pass down
+                                outOfDateFilePaths={outOfDateFilePaths} 
                             />
                         ) : null
                     ))}

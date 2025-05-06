@@ -499,12 +499,21 @@ label {
 .node-icon { margin-right: 3px; flex-shrink: 0; user-select: none; }
 .node-name { flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 1px 3px; border-radius: 2px; cursor: pointer; user-select: none; }
 .node-name.highlight { background-color: var(--highlight-background-color); color: var(--highlight-text-color); border-radius: 2px; padding: 0 2px; margin: 0 -2px; }
+
+/* Existing .node-stats and sub-span styles remain the same */
 .node-stats { margin-left: auto; padding-left: 10px; font-size: 0.8em; color: #aaa; white-space: nowrap; flex-shrink: 0; }
 .node-stats span { margin-left: 6px; }
 .node-stats .lines { color: #6ef076; }
 .node-stats .tokens { color: #f0b76e; }
 .node-stats .time { color: #6ebbf0; }
-.node-stats .selected-count { color: #f0b76e; }
+/* Updated selected-count color */
+.node-stats .selected-count { color: #ffd700; } /* Gold/Yellow */
+
+/* New styles for folder total stats (from previous update) */
+.node-stats .folder-total-lines,
+.node-stats .folder-total-tokens {
+  opacity: 0.75; 
+}
 
 /* Styles for stale/out-of-date files */
 .file-tree-node .node-name.stale {
@@ -843,4 +852,16 @@ label {
   .save-status.saving { color: #555; background-color: rgba(180,180,180,0.5); }
   .save-status.saved { color: darkgreen; background-color: rgba(150,230,150,0.3); }
   .save-status.error { color: var(--danger-color); background-color: rgba(230,150,150,0.3); }
+
+  .node-stats { color: #555; }
+  .node-stats .lines, .node-stats .folder-total-lines { color: #388e3c; } 
+  .node-stats .tokens, .node-stats .folder-total-tokens { color: #ef6c00; } 
+  .node-stats .time { color: #1976d2; } 
+  /* Updated selected-count color for light theme */
+  .node-stats .selected-count { color: #e6b400; } /* Darker Gold/Yellow for light theme */
+
+  .node-stats .folder-total-lines,
+  .node-stats .folder-total-tokens {
+    opacity: 0.8; 
+  }
 }
