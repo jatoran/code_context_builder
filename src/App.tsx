@@ -1,11 +1,10 @@
-
 // src/App.tsx
 // Update layout, state management, and component props to match PDK style/behavior
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import "./App.css"; // Uses the updated App.css
 import ProfileManager from "./components/CodeContextBuilder/ProfileManager/ProfileManager";
-import FileTree from "./components/CodeContextBuilder/FileTree/FileTree";
+import FileTree, { FileTreeRefHandles } from "./components/CodeContextBuilder/FileTree/FileTree"; // Import FileTreeRefHandles
 import Aggregator from "./components/CodeContextBuilder/Aggregator/Aggregator";
 import StatusBar from "./components/CodeContextBuilder/StatusBar";
 import FileViewerModal from "./components/CodeContextBuilder/FileViewerModal";
@@ -145,8 +144,9 @@ function App() {
     const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState<boolean>(false); 
     const [outOfDateFilePaths, setOutOfDateFilePaths] = useState<Set<string>>(new Set()); 
 
-    const [showGlobalCopySuccess, setShowGlobalCopySuccess] = useState<boolean>(false); // New state for global copy notification
+    const [showGlobalCopySuccess, setShowGlobalCopySuccess] = useState<boolean>(false);
     const globalCopySuccessTimerRef = useRef<number | null>(null);
+    const fileTreeRef = useRef<FileTreeRefHandles>(null); // Ref for FileTree component
 
 
     const prevProfileId = useRef<number | null>(null); 
@@ -692,7 +692,10 @@ function App() {
         const target = event.target as HTMLElement;
         const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
-        if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'C') {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+            event.preventDefault();
+            fileTreeRef.current?.focusSearchInput();
+        } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'C') {
             event.preventDefault();
             window.dispatchEvent(new CustomEvent('hotkey-copy-aggregated'));
         } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'R') {
@@ -716,7 +719,7 @@ function App() {
             event.preventDefault();
             setSelectedPaths(new Set());
         }
-    }, [treeData, selectedProfileId, isScanning, handleScanProfile]); 
+    }, [treeData, selectedProfileId, isScanning, handleScanProfile, fileTreeRef]); 
 
     useEffect(() => {
         window.addEventListener('keydown', handleGlobalKeyDown);
@@ -818,6 +821,7 @@ function App() {
                         </button>
                     </div>
                     <FileTree
+                        ref={fileTreeRef} // Pass the ref here
                         treeData={treeData}
                         selectedPaths={selectedPaths}
                         onToggleSelection={handleToggleSelection}

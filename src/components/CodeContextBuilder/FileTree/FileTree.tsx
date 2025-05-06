@@ -1,11 +1,13 @@
-
-
 // src/components/CodeContextBuilder/FileTree/FileTree.tsx
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { FileNode } from '../../../types/scanner';
 import FileTreeNode from './FileTreeNode';
 import { nodeOrDescendantMatches, findNodeByPath, getNodeDepth, getAllDescendantDirPaths } from './fileTreeUtils';
+
+export interface FileTreeRefHandles {
+    focusSearchInput: () => void;
+}
 
 interface FileTreeProps {
     treeData: FileNode | null;
@@ -16,10 +18,10 @@ interface FileTreeProps {
     onViewFile: (path: string) => void;
     expandedPaths: Set<string>;
     onToggleExpand: (path: string) => void;
-    outOfDateFilePaths: Set<string>; // New prop
+    outOfDateFilePaths: Set<string>;
 }
 
-const FileTree: React.FC<FileTreeProps> = ({
+const FileTree = forwardRef<FileTreeRefHandles, FileTreeProps>(({
     treeData,
     selectedPaths,
     onToggleSelection,
@@ -28,11 +30,17 @@ const FileTree: React.FC<FileTreeProps> = ({
     onViewFile,
     expandedPaths,
     onToggleExpand,
-    outOfDateFilePaths, // Destructure new prop
-}) => {
+    outOfDateFilePaths,
+}, ref) => {
     const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    useImperativeHandle(ref, () => ({
+        focusSearchInput: () => {
+            inputRef.current?.focus();
+        }
+    }));
 
     const matchingNodes: FileNode[] = useMemo(() => {
         if (!searchTerm || !treeData) return [];
@@ -225,7 +233,7 @@ const FileTree: React.FC<FileTreeProps> = ({
                 <input
                     ref={inputRef}
                     type="text"
-                    placeholder="Search files (Arrows, Enter, Esc)..."
+                    placeholder="Search files (Ctrl+F, Arrows, Enter, Esc)..."
                     value={searchTerm}
                     onChange={(e) => onSearchTermChange(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -249,7 +257,7 @@ const FileTree: React.FC<FileTreeProps> = ({
                             expandedPaths={effectiveExpandedPaths}
                             onToggleExpand={onToggleExpand}
                             highlightedPath={highlightedPath}
-                            outOfDateFilePaths={outOfDateFilePaths} // Pass down
+                            outOfDateFilePaths={outOfDateFilePaths}
                         />
                    ) : (
                        searchTerm && <li style={{ padding: '1em', color: '#888', fontStyle: 'italic' }}>No matching files found.</li>
@@ -258,6 +266,6 @@ const FileTree: React.FC<FileTreeProps> = ({
             </div>
         </>
     );
-};
+});
 
 export default FileTree;

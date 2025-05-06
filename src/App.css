@@ -835,9 +835,6 @@ label {
       border-color: var(--danger-color);
       color: var(--bg-color); /* Ensure contrast on hover for light theme */
   }
-  .profile-manager button.scan-btn-scanning {
-    /* Adjustments for light theme if needed, though pulseBorder should be fine */
-  }
 
   .left-panel { border-right-color: var(--border-color); background-color: var(--left-panel-bg-color); }
   .left-panel-profile-manager { border-bottom-color: var(--border-color); }
@@ -845,10 +842,6 @@ label {
   .file-tree-header { border-bottom-color: var(--border-secondary-color); }
   .hotkeys-help-btn { color: var(--label-text-color); }
   .hotkeys-help-btn:hover { background-color: var(--card-bg-color); border-color: var(--border-color); color: var(--text-color); }
-  .header-scanning-indicator {
-    /* color: var(--accent-color); */ /* Already uses accent color which is fine for light */
-    /* The pulseOpacity animation uses label-text-color for 50% state, which is fine */
-  }
 
 
   .aggregator-content { background-color: var(--input-background-color); border-color: var(--border-color); color: var(--text-color); }

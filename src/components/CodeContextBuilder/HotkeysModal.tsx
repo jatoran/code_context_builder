@@ -6,6 +6,7 @@ interface HotkeysModalProps {
     onClose: () => void;
 }
 
+
 const HotkeysModal: React.FC<HotkeysModalProps> = ({ isOpen, onClose }) => {
     useEffect(() => {
         if (!isOpen) return;
@@ -41,6 +42,7 @@ const HotkeysModal: React.FC<HotkeysModalProps> = ({ isOpen, onClose }) => {
                         
                         <li><i>When File Explorer is active (not in an input field):</i></li>
                         <ul>
+                            <li><kbd>Ctrl</kbd> / <kbd>Cmd</kbd> + <kbd>F</kbd> (or <kbd>Ctrl</kbd> / <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd>): Focus Search Input</li>
                             <li><kbd>Ctrl</kbd> + <kbd>A</kbd> : Select All Files</li>
                             <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> : Deselect All Files</li>
                             <li>
