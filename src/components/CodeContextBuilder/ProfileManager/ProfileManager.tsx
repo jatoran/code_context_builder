@@ -31,6 +31,7 @@ function safeGetItem<T>(key: string, defaultValue: T): T {
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
+
 const ProfileManager: React.FC<ProfileManagerProps> = ({
   profiles,
   selectedProfileId,
@@ -46,7 +47,7 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
   onDeleteProfile,
   onScanProfile,
   isScanning,
-  outOfDateFileCount, // Destructure new prop
+  outOfDateFileCount,
 }) => {
   const [showSettings, setShowSettings] = useState<boolean>(() => safeGetItem('ccb_showProfileSettings', true));
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -110,9 +111,16 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
   const scanButtonIcon = isScanning 
     ? '⏳' 
     : outOfDateFileCount > 0 
-    ? '🔄' // Refresh icon for stale
+    ? '🔄' 
     : '🔍';
-
+  
+  const scanButtonClasses = [];
+  if (outOfDateFileCount > 0 && !isScanning) {
+    scanButtonClasses.push('scan-btn-stale');
+  }
+  if (isScanning) {
+    scanButtonClasses.push('scan-btn-scanning');
+  }
 
   return (
     <div className="profile-manager">
@@ -122,7 +130,8 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
             <span className={`save-status ${saveStatus} visible`}>{getSaveStatusMessage()}</span>
         )}
       </div>
-      <div className="profile-controls">
+
+      <div className="pm-row-select">
         <select
           value={selectedProfileId}
           onChange={(e) => onProfileSelect(Number(e.target.value))}
@@ -136,23 +145,27 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
             </option>
           ))}
         </select>
+      </div>
 
-        <button onClick={onCreateProfile} disabled={isScanning} title="Create a new profile">➕</button>
-        <button onClick={onDeleteProfile} disabled={!profileSelected || isScanning} title="Delete the selected profile">🗑️</button>
+      <div className="pm-row-buttons">
+        <div className="pm-buttons-group-left">
+          <button onClick={onCreateProfile} disabled={isScanning} title="Create a new profile">➕</button>
+          <button onClick={onDeleteProfile} disabled={!profileSelected || isScanning} title="Delete the selected profile">🗑️</button>
+          <button 
+              onClick={() => setShowSettings(!showSettings)} 
+              disabled={isScanning || !profileSelected} 
+              title={showSettings ? "Hide Profile Settings" : "Show Profile Settings"}
+          >
+            {showSettings ? '⚙️' : '⚙️'} 
+          </button>
+        </div>
         <button
            onClick={onScanProfile}
            disabled={!profileSelected || isScanning}
            title={scanButtonTitle}
-           className={outOfDateFileCount > 0 && !isScanning ? 'scan-btn-stale' : ''}
+           className={scanButtonClasses.join(' ')}
         >
-           {scanButtonIcon}
-        </button>
-        <button 
-            onClick={() => setShowSettings(!showSettings)} 
-            disabled={isScanning || !profileSelected} 
-            title={showSettings ? "Hide Profile Settings" : "Show Profile Settings"}
-        >
-          {showSettings ? '⚙️' : '⚙️'} 
+           {scanButtonIcon} Scan
         </button>
       </div>
 

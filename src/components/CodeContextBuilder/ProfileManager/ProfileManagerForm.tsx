@@ -39,6 +39,12 @@ const ProfileManagerForm: React.FC<ProfileManagerFormProps> = ({
      }
   }, [rootFolder, setRootFolder]);
 
+  const ignorePatternTooltip = `Patterns are case-insensitive.
+- Simple string: "my_file.txt" (matches if path contains "my_file.txt")
+- Folder name: "/node_modules/" (matches any path containing "/node_modules/" as a segment)
+- Exact path: "\\"exact/path/to/ignore\\"" (matches the exact path, use quotes if path contains spaces or special chars for patterns)
+One pattern per line.`;
+
   return (
     <div className="profile-form">
       <div className="form-field">
@@ -74,7 +80,16 @@ const ProfileManagerForm: React.FC<ProfileManagerFormProps> = ({
       </div>
 
       <div className="form-field">
-        <label htmlFor="ignorePatterns">Ignore Patterns (one per line):</label>
+        <label htmlFor="ignorePatterns">
+          Ignore Patterns (one per line):
+          <span 
+            title={ignorePatternTooltip} 
+            style={{ cursor: 'help', marginLeft: '5px', color: 'var(--label-text-color)' }}
+            aria-label="Ignore pattern syntax information"
+          >
+            ℹ️
+          </span>
+        </label>
         <textarea
           id="ignorePatterns"
           rows={5} // Increased rows slightly

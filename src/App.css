@@ -5,6 +5,7 @@
   --bg-color: #1e1e1e;
   --text-color: #ffffff;
   --accent-color: #396cd8;
+  --accent-color-rgb: 57, 108, 216; /* New: RGB for accent color */
   --border-color: #3a3a3a;
   --card-bg-color: #2b2b2b;
   --card-bg-color2: #272727;
@@ -31,6 +32,12 @@
   --highlight-text-color: #eee; /* PDK Style Search Highlight Text */
   --overlay-background-color: rgba(0, 0, 0, 0.7);
   --modal-shadow-color: rgba(0, 0, 0, 0.3);
+
+  /* Global Notification/Toast Variables */
+  --toast-success-bg: rgba(70, 150, 70, 0.9);
+  --toast-success-text: lightgreen;
+  --toast-error-bg: rgba(150, 70, 70, 0.9);
+  --toast-error-text: var(--danger-color);
 }
 
 
@@ -85,6 +92,7 @@ html, body, #root {
   width: 100%;
   overflow: hidden;
   background-color: var(--background-color);
+  position: relative; /* Needed for absolute positioning of global toast */
 }
 
 /* Wrapper for Sidebar + Main Content Area */
@@ -177,6 +185,14 @@ html, body, #root {
     border-color: var(--border-color);
     color: var(--text-color);
 }
+/* New: Scanning indicator in file tree header */
+.header-scanning-indicator {
+  margin-left: 0.5em;
+  font-size: 0.9em;
+  font-style: italic;
+  animation: pulseOpacity 1.5s infinite ease-in-out;
+  color: var(--accent-color); /* Start with accent color */
+}
 
 
 /* ==========================================================================
@@ -198,7 +214,7 @@ button {
   border: 1px solid var(--border-color);
   padding: 0.5rem 1rem; /* PDK padding */
   border-radius: 6px; /* PDK radius */
-  transition: background-color var(--transition-speed), border-color var(--transition-speed), color var(--transition-speed);
+  transition: background-color var(--transition-speed), border-color var(--transition-speed), color var(--transition-speed), box-shadow var(--transition-speed);
   margin: 0 4px; /* Default spacing */
   font-size: 0.9em; /* Slightly smaller base button font */
 }
@@ -270,39 +286,59 @@ label {
 .profile-manager {
   display: flex;
   flex-direction: column;
-  gap: 0.8em; /* Reduced gap */
+  gap: 0.8em; 
 }
 .profile-manager h3 {
-    margin-bottom: 0.5em; /* Space below heading */
-    font-size: 1.1em; /* Slightly smaller */
+    margin-bottom: 0.5em; 
+    font-size: 1.1em; 
 }
-.profile-controls {
+
+/* New layout for Profile Manager controls */
+.pm-row-select {
+  width: 100%;
+  margin-bottom: 0.5em; /* Space between dropdown and button row */
+}
+.pm-row-select select {
+  width: 100%; /* Make select full width */
+  padding: 0.4rem 0.6rem; 
+  font-size: 0.9em;
+}
+
+.pm-row-buttons {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: space-between; /* Pushes scan button to the right */
   align-items: center;
-  gap: 0.5em; /* Spacing between controls */
+  width: 100%;
+  gap: 0.5em; /* Consistent gap */
 }
-.profile-controls select {
-    flex-grow: 1;
-    min-width: 120px; /* Can be smaller */
-    padding: 0.4rem 0.6rem; /* Match button/input padding */
-    font-size: 0.9em;
+.pm-buttons-group-left {
+  display: flex;
+  gap: 0.5em; /* Gap between New, Delete, Settings buttons */
+  align-items: center;
 }
-.profile-controls button {
-    padding: 0.4rem 0.6rem; /* Smaller buttons */
-    font-size: 1em; /* For icons */
-    margin: 0;
-    line-height: 1; /* Better icon alignment */
+
+/* General button styling within ProfileManager (was previously .profile-controls button) */
+.profile-manager button {
+  padding: 0.4rem 0.6rem; 
+  font-size: 1em; /* For icons */
+  margin: 0; /* Remove default button margin */
+  line-height: 1; /* Better icon alignment */
 }
-.profile-controls button.scan-btn-stale {
-    /* Indication for stale scan */
+
+/* Specific styles for Scan button in ProfileManager */
+.profile-manager button.scan-btn-stale {
     border-color: var(--danger-color);
     color: var(--danger-color);
 }
-.profile-controls button.scan-btn-stale:hover {
+.profile-manager button.scan-btn-stale:hover {
     background-color: var(--danger-color);
     border-color: var(--danger-color);
-    color: var(--text-color); /* White text on red background for hover */
+    color: var(--text-color); 
+}
+.profile-manager button.scan-btn-scanning {
+  animation: pulseBorder 1.5s infinite ease-in-out;
+  opacity: 1; 
+  cursor: not-allowed; 
 }
 
 
@@ -646,6 +682,44 @@ label {
     margin-left: 0.3em;
 }
 
+/* New: Global Copy Success Toast */
+.global-copy-success-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--toast-success-bg);
+  color: var(--toast-success-text);
+  padding: 0.8em 1.5em;
+  border-radius: 6px;
+  box-shadow: 0 3px 10px var(--modal-shadow-color);
+  z-index: 2000; /* Above everything else */
+  font-size: 0.9em;
+  font-weight: 500;
+  opacity: 0;
+  animation: fadeInOutToast 2s ease-in-out forwards;
+  pointer-events: none; /* Don't block clicks */
+}
+
+@keyframes fadeInOutToast {
+  0% { opacity: 0; transform: translate(-50%, -10px); }
+  10% { opacity: 1; transform: translate(-50%, 0); } /* Fade in quickly */
+  90% { opacity: 1; transform: translate(-50%, 0); } /* Hold */
+  100% { opacity: 0; transform: translate(-50%, -10px); } /* Fade out */
+}
+
+
+/* New Animations */
+@keyframes pulseOpacity {
+  0%, 100% { opacity: 1; color: var(--accent-color); }
+  50% { opacity: 0.6; color: var(--label-text-color); }
+}
+@keyframes pulseBorder {
+  0% { box-shadow: 0 0 0 0px rgba(var(--accent-color-rgb), 0.5); }
+  70% { box-shadow: 0 0 0 4px rgba(var(--accent-color-rgb), 0); }
+  100% { box-shadow: 0 0 0 0px rgba(var(--accent-color-rgb), 0); }
+}
+
 
 /* Utility Styles */
 .flex-row { display: flex; align-items: center; gap: 1rem; }
@@ -661,6 +735,7 @@ label {
     --bg-color: #ffffff;
     --text-color: #213547;
     --accent-color: #396cd8;
+    --accent-color-rgb: 57, 108, 216; /* Same RGB for light theme */
     --active-tab-bg-color: #e0e8f7;
     --active-tab-border-color: #a0b3d7;
     --border-color: #ccc;
@@ -682,6 +757,11 @@ label {
     --highlight-text-color: #333;
     --overlay-background-color: rgba(255, 255, 255, 0.7);
     --modal-shadow-color: rgba(0, 0, 0, 0.1);
+
+    --toast-success-bg: rgba(150, 230, 150, 0.9);
+    --toast-success-text: darkgreen;
+    --toast-error-bg: rgba(230, 150, 150, 0.9);
+    --toast-error-text: var(--danger-color);
   }
 
   button { background-color: #f9f9f9; color: var(--text-color); border: 1px solid var(--border-color); }
@@ -689,14 +769,18 @@ label {
   button.delete-btn { background-color: var(--danger-color); border-color: var(--danger-color); color: #fff; }
   button.delete-btn:hover { background-color: #b00; border-color: #b00; }
   button:disabled { background-color: #e0e0e0; border-color: #d0d0d0; color: #999; }
-  .profile-controls button.scan-btn-stale {
+  
+  .profile-manager button.scan-btn-stale {
       border-color: var(--danger-color);
       color: var(--danger-color);
   }
-  .profile-controls button.scan-btn-stale:hover {
+  .profile-manager button.scan-btn-stale:hover {
       background-color: var(--danger-color);
       border-color: var(--danger-color);
       color: var(--bg-color); /* Ensure contrast on hover for light theme */
+  }
+  .profile-manager button.scan-btn-scanning {
+    /* Adjustments for light theme if needed, though pulseBorder should be fine */
   }
 
   .left-panel { border-right-color: var(--border-color); background-color: var(--left-panel-bg-color); }
@@ -705,6 +789,10 @@ label {
   .file-tree-header { border-bottom-color: var(--border-secondary-color); }
   .hotkeys-help-btn { color: var(--label-text-color); }
   .hotkeys-help-btn:hover { background-color: var(--card-bg-color); border-color: var(--border-color); color: var(--text-color); }
+  .header-scanning-indicator {
+    /* color: var(--accent-color); */ /* Already uses accent color which is fine for light */
+    /* The pulseOpacity animation uses label-text-color for 50% state, which is fine */
+  }
 
 
   .aggregator-content { background-color: var(--input-background-color); border-color: var(--border-color); color: var(--text-color); }

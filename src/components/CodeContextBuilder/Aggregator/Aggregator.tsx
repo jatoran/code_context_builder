@@ -1,4 +1,3 @@
-
 // src/components/CodeContextBuilder/Aggregator/Aggregator.tsx
 import React, { useEffect } from 'react'; // Added useEffect
 import { FileNode } from '../../../types/scanner';
@@ -7,9 +6,10 @@ import { useAggregator, OutputFormat } from '../../../hooks/useAggregator'; // I
 interface AggregatorProps {
     selectedPaths: Set<string>;
     treeData: FileNode | null; 
+    selectedProfileId: number | null; // Added selectedProfileId
 }
 
-const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData }) => {
+const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, selectedProfileId }) => {
     const {
         aggregatedText,
         tokenCount,
@@ -21,7 +21,7 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData }) => {
         setPrependFileTree,
         handleCopyToClipboard,
         copySuccess,
-    } = useAggregator({ treeData, selectedPaths });
+    } = useAggregator({ treeData, selectedPaths, selectedProfileId }); // Pass selectedProfileId
 
     // Listen for hotkey event to trigger copy
     useEffect(() => {
@@ -93,8 +93,9 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData }) => {
                     disabled={!aggregatedText || isLoading}
                     style={{
                         backgroundColor: copySuccess ? "var(--accent-color)" : undefined,
-                        color: copySuccess ? "#fff" : undefined, // Ensure text is visible on accent bg
-                        transition: 'background-color 0.3s ease, color 0.3s ease'
+                        color: copySuccess ? "#fff" : undefined, 
+                        borderColor: copySuccess ? "var(--accent-color)" : undefined,
+                        transition: 'background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease'
                     }}
                 >
                     {copySuccess ? 'Copied!' : 'Copy Aggregated'}

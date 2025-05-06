@@ -1,3 +1,4 @@
+
 // src/hooks/useAggregator.ts
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -6,16 +7,22 @@ import {
     formatFileContent,
     formatFolderHeader,
     formatFolderFooter,
-    generateFormattedFileTree, // For selection-based tree (if ever needed again directly)
+    // generateFormattedFileTree, // For selection-based tree (if ever needed again directly)
     generateFullScannedFileTree, // For full scanned tree
     getLanguageFromPath,
 } from '../components/CodeContextBuilder/Aggregator/aggregatorUtils';
 
 export type OutputFormat = 'markdown' | 'xml';
 
+interface AggregatorSettings {
+    format: OutputFormat;
+    prependTree: boolean;
+}
+
 interface UseAggregatorProps {
     treeData: FileNode | null;
     selectedPaths: Set<string>;
+    selectedProfileId: number | null; // Added selectedProfileId
 }
 
 interface UseAggregatorReturn {
@@ -40,20 +47,82 @@ const isDirRelevantForAggregation = (dirNode: FileNode, selectedPaths: Set<strin
 };
 
 
-export function useAggregator({ treeData, selectedPaths }: UseAggregatorProps): UseAggregatorReturn {
+
+export function useAggregator({ treeData, selectedPaths, selectedProfileId }: UseAggregatorProps): UseAggregatorReturn {
     const [aggregatedText, setAggregatedText] = useState<string>('');
     const [tokenCount, setTokenCount] = useState<number>(0);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [copySuccess, setCopySuccess] = useState<boolean>(false);
 
-    const [selectedFormat, setSelectedFormat] = useState<OutputFormat>('markdown');
-    const [prependFileTree, setPrependFileTree] = useState<boolean>(false);
+    // Internal state for format and prepend options
+    const [currentSelectedFormat, setCurrentSelectedFormat] = useState<OutputFormat>('markdown');
+    const [currentPrependFileTree, setCurrentPrependFileTree] = useState<boolean>(false);
+
+    // Effect to load settings from localStorage when selectedProfileId changes
+    useEffect(() => {
+        if (selectedProfileId && selectedProfileId > 0) {
+            try {
+                const storedSettingsRaw = localStorage.getItem(`ccb_agg_settings_${selectedProfileId}`);
+                if (storedSettingsRaw) {
+                    const settings: AggregatorSettings = JSON.parse(storedSettingsRaw);
+                    if (settings.format && (settings.format === 'markdown' || settings.format === 'xml')) {
+                        setCurrentSelectedFormat(settings.format);
+                    } else {
+                        setCurrentSelectedFormat('markdown'); // Default if invalid
+                    }
+                    if (typeof settings.prependTree === 'boolean') {
+                        setCurrentPrependFileTree(settings.prependTree);
+                    } else {
+                        setCurrentPrependFileTree(false); // Default if invalid
+                    }
+                } else {
+                    // No settings stored for this profile, use defaults
+                    setCurrentSelectedFormat('markdown');
+                    setCurrentPrependFileTree(false);
+                }
+            } catch (e) {
+                console.error("Failed to parse aggregator settings from localStorage for profile " + selectedProfileId, e);
+                setCurrentSelectedFormat('markdown');
+                setCurrentPrependFileTree(false);
+            }
+        } else {
+            // No profile selected (or ID is 0), reset to defaults
+            setCurrentSelectedFormat('markdown');
+            setCurrentPrependFileTree(false);
+        }
+    }, [selectedProfileId]);
+
+    // Exported setters that update local state and save to localStorage
+    const handleSetSelectedFormat = useCallback((format: OutputFormat) => {
+        setCurrentSelectedFormat(format);
+        if (selectedProfileId && selectedProfileId > 0) {
+            const newSettings: AggregatorSettings = { format, prependTree: currentPrependFileTree };
+            try {
+                localStorage.setItem(`ccb_agg_settings_${selectedProfileId}`, JSON.stringify(newSettings));
+            } catch (e) {
+                console.error("Failed to save aggregator format to localStorage", e);
+            }
+        }
+    }, [selectedProfileId, currentPrependFileTree]);
+
+    const handleSetPrependFileTree = useCallback((prepend: boolean) => {
+        setCurrentPrependFileTree(prepend);
+        if (selectedProfileId && selectedProfileId > 0) {
+            const newSettings: AggregatorSettings = { format: currentSelectedFormat, prependTree: prepend };
+            try {
+                localStorage.setItem(`ccb_agg_settings_${selectedProfileId}`, JSON.stringify(newSettings));
+            } catch (e) {
+                console.error("Failed to save aggregator prependTree to localStorage", e);
+            }
+        }
+    }, [selectedProfileId, currentSelectedFormat]);
+
 
     const buildAggregatedContentRecursive = useCallback(async (
         currentNode: FileNode,
         currentMarkDownDepth: number,
-        format: OutputFormat
+        formatToUse: OutputFormat // Pass format explicitly
     ): Promise<string> => {
         let builtContent = "";
 
@@ -65,11 +134,11 @@ export function useAggregator({ treeData, selectedPaths }: UseAggregatorProps): 
             try {
                 const fileContent = await invoke<string>("read_file_contents", { filePath: fileNode.path });
                 const lang = getLanguageFromPath(fileNode.path);
-                builtContent += formatFileContent(fileNode.path, fileNode.name, fileContent, format, currentMarkDownDepth, lang);
+                builtContent += formatFileContent(fileNode.path, fileNode.name, fileContent, formatToUse, currentMarkDownDepth, lang);
             } catch (e) {
                 const lang = getLanguageFromPath(fileNode.path);
                 const errorMsg = e instanceof Error ? e.message : String(e);
-                builtContent += formatFileContent(fileNode.path, fileNode.name, `// Error reading file: ${errorMsg}`, format, currentMarkDownDepth, lang);
+                builtContent += formatFileContent(fileNode.path, fileNode.name, `// Error reading file: ${errorMsg}`, formatToUse, currentMarkDownDepth, lang);
             }
         }
 
@@ -79,13 +148,13 @@ export function useAggregator({ treeData, selectedPaths }: UseAggregatorProps): 
 
         for (const dirNode of dirsInCurrentNode) {
             if (isDirRelevantForAggregation(dirNode, selectedPaths)) {
-                builtContent += formatFolderHeader(dirNode.name, dirNode.path, format, currentMarkDownDepth);
-                builtContent += await buildAggregatedContentRecursive(dirNode, currentMarkDownDepth + 1, format);
-                builtContent += formatFolderFooter(format, currentMarkDownDepth);
+                builtContent += formatFolderHeader(dirNode.name, dirNode.path, formatToUse, currentMarkDownDepth);
+                builtContent += await buildAggregatedContentRecursive(dirNode, currentMarkDownDepth + 1, formatToUse);
+                builtContent += formatFolderFooter(formatToUse, currentMarkDownDepth);
             }
         }
         return builtContent;
-    }, [selectedPaths]);
+    }, [selectedPaths]); // Removed currentSelectedFormat from here, will pass it
 
     const generateAggregatedText = useCallback(async () => {
         setIsLoading(true);
@@ -101,38 +170,37 @@ export function useAggregator({ treeData, selectedPaths }: UseAggregatorProps): 
             return;
         }
 
+        // Use the current state values for format and prepend
+        const formatToUse = currentSelectedFormat;
+        const prependToUse = currentPrependFileTree;
+
         // Step 1: Generate prepended tree string if requested
-        if (prependFileTree) {
-            textForPrependedTree = generateFullScannedFileTree(treeData, selectedFormat);
+        if (prependToUse) {
+            textForPrependedTree = generateFullScannedFileTree(treeData, formatToUse);
         }
 
         // Step 2: Aggregate core content if paths are selected
         if (selectedPaths.size > 0) {
             if (treeData.is_dir) {
-                // This logic ensures that if the root directory itself isn't directly part of selection path traversal
-                // but contains selected children, we still process its children.
-                // buildAggregatedContentRecursive will handle the selectedPaths filtering internally.
                 let rootRelevantForHeader = isDirRelevantForAggregation(treeData, selectedPaths);
                 
                 if (rootRelevantForHeader) {
-                    aggregatedCoreContent += formatFolderHeader(treeData.name, treeData.path, selectedFormat, 1);
-                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, 2, selectedFormat);
-                    aggregatedCoreContent += formatFolderFooter(selectedFormat, 1);
+                    aggregatedCoreContent += formatFolderHeader(treeData.name, treeData.path, formatToUse, 1);
+                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, 2, formatToUse);
+                    aggregatedCoreContent += formatFolderFooter(formatToUse, 1);
                 } else {
-                    // If root isn't "relevant" for a header (e.g., only deep children selected),
-                    // still try to build content from its children.
-                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, 1, selectedFormat);
+                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, 1, formatToUse);
                 }
 
             } else if (selectedPaths.has(treeData.path)) { // Root is a single selected file
                 try {
                     const fileContent = await invoke<string>("read_file_contents", { filePath: treeData.path });
                     const lang = getLanguageFromPath(treeData.path);
-                    aggregatedCoreContent += formatFileContent(treeData.path, treeData.name, fileContent, selectedFormat, 1, lang);
+                    aggregatedCoreContent += formatFileContent(treeData.path, treeData.name, fileContent, formatToUse, 1, lang);
                 } catch (e) {
                     const lang = getLanguageFromPath(treeData.path);
                     const errorMsg = e instanceof Error ? e.message : String(e);
-                    aggregatedCoreContent += formatFileContent(treeData.path, treeData.name, `// Error reading file: ${errorMsg}`, selectedFormat, 1, lang);
+                    aggregatedCoreContent += formatFileContent(treeData.path, treeData.name, `// Error reading file: ${errorMsg}`, formatToUse, 1, lang);
                 }
             }
         }
@@ -148,12 +216,10 @@ export function useAggregator({ treeData, selectedPaths }: UseAggregatorProps): 
             finalOutput = aggregatedCoreContent;
         }
         
-        // Post-processing: Ensure Markdown doesn't end with superfluous separator
-        // and XML has a final newline if content exists.
-        if (selectedFormat === 'markdown' && finalOutput.endsWith('---\n\n')) {
+        if (formatToUse === 'markdown' && finalOutput.endsWith('---\n\n')) {
             finalOutput = finalOutput.slice(0, -5);
         }
-        if (selectedFormat === 'xml' && finalOutput.length > 0 && !finalOutput.endsWith('\n')) {
+        if (formatToUse === 'xml' && finalOutput.length > 0 && !finalOutput.endsWith('\n')) {
             finalOutput += '\n';
         }
 
@@ -174,22 +240,24 @@ export function useAggregator({ treeData, selectedPaths }: UseAggregatorProps): 
         }
 
         setIsLoading(false);
-    }, [treeData, selectedPaths, selectedFormat, prependFileTree, buildAggregatedContentRecursive]);
+    }, [treeData, selectedPaths, currentSelectedFormat, currentPrependFileTree, buildAggregatedContentRecursive]);
 
     useEffect(() => {
         generateAggregatedText();
-    }, [generateAggregatedText]);
+    }, [generateAggregatedText]); // This will run when currentSelectedFormat or currentPrependFileTree changes (among others)
 
     const handleCopyToClipboard = useCallback(async () => {
         if (!aggregatedText || isLoading) return;
         try {
             await navigator.clipboard.writeText(aggregatedText);
             setCopySuccess(true);
+            window.dispatchEvent(new CustomEvent('global-copy-success')); // Dispatch global event
             setTimeout(() => setCopySuccess(false), 1500);
         } catch (err) {
             console.error("Failed to copy to clipboard:", err);
             const errorMsg = err instanceof Error ? err.message : String(err);
             setError(`Failed to copy: ${errorMsg}`);
+            // Consider dispatching a 'global-copy-error' event here if needed
             alert("Failed to copy text. See console for details.");
         }
     }, [aggregatedText, isLoading]);
@@ -199,10 +267,10 @@ export function useAggregator({ treeData, selectedPaths }: UseAggregatorProps): 
         tokenCount,
         isLoading,
         error,
-        selectedFormat,
-        setSelectedFormat,
-        prependFileTree,
-        setPrependFileTree,
+        selectedFormat: currentSelectedFormat, // Return current state
+        setSelectedFormat: handleSetSelectedFormat, // Return new handler
+        prependFileTree: currentPrependFileTree, // Return current state
+        setPrependFileTree: handleSetPrependFileTree, // Return new handler
         handleCopyToClipboard,
         copySuccess,
     };

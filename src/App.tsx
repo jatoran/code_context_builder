@@ -14,6 +14,7 @@ import { Profile } from "./types/profiles";
 import { FileNode } from "./types/scanner";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { Window, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window"; // Changed appWindow to getCurrent
 import { findNodeByPath as findNodeByPathUtil } from "./components/CodeContextBuilder/FileTree/fileTreeUtils"; // Renamed import
 
 
@@ -26,6 +27,31 @@ interface MonitoredFile {
     last_modified: string;
     size: number; // Rust uses u64, TS number is fine for typical sizes
 }
+
+// --- Window Geometry Persistence ---
+const WINDOW_GEOMETRY_KEY = 'ccb_window_geometry';
+interface WindowGeometry {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// Debounce utility
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const debounce = <F extends (...args: any[]) => any>(func: F, delay: number) => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    return (...args: Parameters<F>): void => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => {
+        func(...args);
+      }, delay);
+    };
+  };
+// --- End Window Geometry Persistence ---
+
 
 // --- Tree Traversal & Stat Helpers (Adapted from Standalone/PDK) ---
 const getAllFilePaths = (node: FileNode | null): string[] => {
@@ -91,6 +117,8 @@ const calculateTreeStats = (node: FileNode | null): TreeStats => {
 // --- End Helpers ---
 
 
+
+
 function App() {
     const [profiles, setProfiles] = useState<Profile[]>([]);
     const [selectedProfileId, setSelectedProfileId] = useState<number>(0); 
@@ -115,34 +143,150 @@ function App() {
         try { return localStorage.getItem('ccb_isLeftPanelCollapsed') === 'true'; } catch { return false; }
     });
     const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState<boolean>(false); 
-    const [outOfDateFilePaths, setOutOfDateFilePaths] = useState<Set<string>>(new Set()); // For file freshness
+    const [outOfDateFilePaths, setOutOfDateFilePaths] = useState<Set<string>>(new Set()); 
+
+    const [showGlobalCopySuccess, setShowGlobalCopySuccess] = useState<boolean>(false); // New state for global copy notification
+    const globalCopySuccessTimerRef = useRef<number | null>(null);
+
 
     const prevProfileId = useRef<number | null>(null); 
 
     const selectedProfile = useMemo(() => profiles.find(p => p.id === selectedProfileId), [profiles, selectedProfileId]);
 
+    // --- Global Copy Success Notification Effect ---
+    useEffect(() => {
+        const handleGlobalCopySuccess = () => {
+            setShowGlobalCopySuccess(true);
+            if (globalCopySuccessTimerRef.current) {
+                clearTimeout(globalCopySuccessTimerRef.current);
+            }
+            globalCopySuccessTimerRef.current = window.setTimeout(() => {
+                setShowGlobalCopySuccess(false);
+            }, 2000); // Show for 2 seconds
+        };
+
+        window.addEventListener('global-copy-success', handleGlobalCopySuccess);
+        return () => {
+            window.removeEventListener('global-copy-success', handleGlobalCopySuccess);
+            if (globalCopySuccessTimerRef.current) {
+                clearTimeout(globalCopySuccessTimerRef.current);
+            }
+        };
+    }, []);
+
+
+     // --- Window Geometry Persistence Effects ---
+     useEffect(() => {
+        const restoreWindowGeometry = async () => {
+            const mainWindow = await Window.getByLabel('main'); 
+            if (!mainWindow) {
+                console.error("Main window not found for geometry restoration.");
+                try {
+                    console.warn("Cannot show window as 'main' label was not found.");
+                } catch (e) {
+                     console.error("Error in fallback window show attempt:", e);
+                }
+                return;
+            }
+
+            try {
+                const savedGeometryStr = localStorage.getItem(WINDOW_GEOMETRY_KEY);
+                if (savedGeometryStr) {
+                    const savedGeometry: WindowGeometry = JSON.parse(savedGeometryStr);
+                    if (typeof savedGeometry.x === 'number' &&
+                        typeof savedGeometry.y === 'number' &&
+                        typeof savedGeometry.width === 'number' && savedGeometry.width > 0 &&
+                        typeof savedGeometry.height === 'number' && savedGeometry.height > 0) {
+                        
+                        await mainWindow.setPosition(new PhysicalPosition(savedGeometry.x, savedGeometry.y));
+                        await mainWindow.setSize(new PhysicalSize(savedGeometry.width, savedGeometry.height));
+                        console.log('Restored window geometry:', savedGeometry);
+                    } else {
+                        console.warn('Invalid or incomplete window geometry in localStorage:', savedGeometry);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to restore window geometry:', err);
+            } finally {
+                if (mainWindow) {
+                    await mainWindow.show(); 
+                    await mainWindow.setFocus();
+                }
+            }
+        };
+        restoreWindowGeometry();
+    }, []);
+
+    useEffect(() => {
+        const saveCurrentWindowGeometry = async () => {
+            const mainWindow = await Window.getByLabel('main'); 
+            if (!mainWindow) {
+                console.error("Main window not found for geometry saving.");
+                return;
+            }
+
+            try {
+                if (await mainWindow.isMinimized() || await mainWindow.isMaximized() || !(await mainWindow.isVisible())) {
+                    return; 
+                }
+                const position = await mainWindow.outerPosition();
+                const size = await mainWindow.outerSize();
+                if (size.width > 0 && size.height > 0) {
+                    const geometry: WindowGeometry = {
+                        x: position.x,
+                        y: position.y,
+                        width: size.width,
+                        height: size.height,
+                    };
+                    localStorage.setItem(WINDOW_GEOMETRY_KEY, JSON.stringify(geometry));
+                }
+            } catch (error) {
+                console.error('Failed to save window geometry:', error);
+            }
+        };
+
+        const debouncedSaveGeometry = debounce(saveCurrentWindowGeometry, 500);
+        let unlistenResized: (() => void) | undefined;
+        let unlistenMoved: (() => void) | undefined;
+
+        const setupListeners = async () => {
+            const mainWindow = await Window.getByLabel('main'); 
+            if (mainWindow) {
+                unlistenResized = await mainWindow.onResized(debouncedSaveGeometry);
+                unlistenMoved = await mainWindow.onMoved(debouncedSaveGeometry);
+            } else {
+                 console.error("Main window not found for setting up resize/move listeners.");
+            }
+        };
+
+        setupListeners();
+
+        return () => {
+            if (unlistenResized) unlistenResized();
+            if (unlistenMoved) unlistenMoved();
+        };
+    }, []);
+    // --- End Window Geometry Persistence Effects ---
+
+
     // --- File Monitoring Control ---
     const [isMonitoringProfile, setIsMonitoringProfile] = useState<number | null>(null);
 
     const stopFileMonitoring = useCallback(async () => {
-        // Check isMonitoringProfile directly, not a stale closure version
         if (isMonitoringProfile !== null) { 
             console.log("[App Monitor] Attempting to stop monitoring for profile:", isMonitoringProfile);
             try {
                 await invoke("stop_monitoring_profile_cmd");
                 console.log("[App Monitor] Successfully stopped monitoring for profile:", isMonitoringProfile);
                 setIsMonitoringProfile(null);
-                setOutOfDateFilePaths(new Set()); // Clear stale paths when stopping
+                setOutOfDateFilePaths(new Set()); 
             } catch (err) {
                 console.error("[App Monitor] Failed to stop file monitoring for profile " + isMonitoringProfile + ":", err);
             }
-        } else {
-            // console.log("[App Monitor] stopFileMonitoring called, but no profile was being monitored.");
         }
-    }, [isMonitoringProfile]); // Depends on the current value of isMonitoringProfile
+    }, [isMonitoringProfile]); 
 
     const startFileMonitoring = useCallback(async (profileId: number, currentTreeData: FileNode | null) => {
-        // Always stop previous before starting new, even if profileId is the same (e.g. treeData reloaded)
         await stopFileMonitoring(); 
         
         if (profileId > 0 && currentTreeData) {
@@ -150,8 +294,7 @@ function App() {
             if (Object.keys(filesToMonitorMap).length > 0) {
                 console.log(`[App Monitor] Preparing to start monitoring for profile ${profileId} with ${Object.keys(filesToMonitorMap).length} files.`);
                 try {
-                    // Use camelCase for the key to match the #[serde(alias = "...")] in Rust
-                    const payload = { profileId, filesToMonitor: filesToMonitorMap }; // ALREADY camelCase
+                    const payload = { profileId, filesToMonitor: filesToMonitorMap }; 
                     console.log("[App Monitor] Invoking start_monitoring_profile_cmd with payload:", JSON.stringify(payload, null, 2));
                     await invoke("start_monitoring_profile_cmd", payload);
                     setIsMonitoringProfile(profileId);
@@ -171,7 +314,6 @@ function App() {
     }, [stopFileMonitoring]);
 
     
-    // Effect to manage monitoring when selected profile or tree data changes
     useEffect(() => {
         console.log(`[App Monitor Effect] Running. Profile ID: ${selectedProfileId}, Tree Data Present: ${!!treeData}`);
         if (selectedProfileId > 0 && treeData) {
@@ -183,7 +325,6 @@ function App() {
         }
     }, [selectedProfileId, treeData, startFileMonitoring, stopFileMonitoring]);
     
-    // Listen for file freshness updates from backend
     useEffect(() => {
         let unlistenFreshness: UnlistenFn | undefined;
         const setupFreshnessListener = async () => {
@@ -207,41 +348,24 @@ function App() {
     const loadProfiles = useCallback(async (selectId?: number) => {
         setIsLoading(true);
         setError(null);
-        // console.log(`[APP loadProfiles] Called. selectId param: ${selectId}`);
         try {
             if (typeof invoke !== 'function') {
                 throw new Error("Tauri API 'invoke' not ready.");
             }
             const loadedProfiles = await invoke<Profile[]>("list_code_context_builder_profiles");
             setProfiles(loadedProfiles);
-            // console.log(`[APP loadProfiles] ${loadedProfiles.length} profiles loaded from backend.`);
-            // if (loadedProfiles.length > 0) {
-            //      console.log(`[APP loadProfiles] First loaded profile ID: ${loadedProfiles[0].id}, Title: ${loadedProfiles[0].title}`);
-            // }
-
+            
             let profileToSelect = 0;
             const lastSelectedIdStr = localStorage.getItem('ccb_lastSelectedProfileId');
             const lastSelectedIdNumFromStorage = lastSelectedIdStr ? parseInt(lastSelectedIdStr, 10) : 0;
 
-            // console.log(`[APP loadProfiles] Logic check - lastSelectedIdStr from localStorage: '${lastSelectedIdStr}', parsed as: ${lastSelectedIdNumFromStorage}`);
-            // console.log(`[APP loadProfiles] Logic check - selectId param: ${selectId}`);
-            // console.log(`[APP loadProfiles] Logic check - loadedProfiles IDs:`, loadedProfiles.map(p => p.id));
-
-
             if (selectId && loadedProfiles.some(p => p.id === selectId)) {
                 profileToSelect = selectId;
-                // console.log(`[APP loadProfiles] Outcome: Selected by selectId param: ${profileToSelect}`);
             } else if (lastSelectedIdNumFromStorage > 0 && loadedProfiles.some(p => p.id === lastSelectedIdNumFromStorage)) {
                 profileToSelect = lastSelectedIdNumFromStorage;
-                // console.log(`[APP loadProfiles] Outcome: Selected from localStorage: ${profileToSelect}`);
             } else if (loadedProfiles.length > 0) {
                 profileToSelect = loadedProfiles[0].id;
-                // console.log(`[APP loadProfiles] Outcome: Selected by fallback to first profile: ${profileToSelect}`);
-            } else {
-                // console.log(`[APP loadProfiles] Outcome: No profiles loaded or found, selecting 0.`);
             }
-            
-            // console.log(`[APP loadProfiles] About to call setSelectedProfileId with: ${profileToSelect}`);
             setSelectedProfileId(profileToSelect);
 
         } catch (err) {
@@ -267,9 +391,6 @@ function App() {
         if (prevProfileId.current !== selectedProfileId) { 
             console.log(`[APP MainEffect] Profile ID changed from ${prevProfileId.current} to ${selectedProfileId}.`);
             
-            // stopFileMonitoring is now called by the monitoring useEffect when selectedProfileId changes.
-            // No need to call it explicitly here.
-
             setEditableTitle(profile?.title || "");
             setEditableRootFolder(profile?.root_folder || "");
             setEditableIgnorePatterns(profile?.ignore_patterns?.join("\n") || "");
@@ -279,7 +400,6 @@ function App() {
                 localStorage.setItem('ccb_lastSelectedProfileId', selectedProfileId.toString());
                 
                 const storedTreeJson = localStorage.getItem(`ccb_treeData_${selectedProfileId}`);
-                // console.log(`[APP MainEffect] Loading tree for profile ${selectedProfileId}. Stored JSON: ${storedTreeJson ? 'Found' : 'Not found'}`);
                 let loadedTree: FileNode | null = null;
                 if (storedTreeJson) {
                     try {
@@ -307,8 +427,7 @@ function App() {
             setSearchTerm("");
             setViewingFilePath(null);
         } else {
-            // console.log(`[APP MainEffect] Profile ID did NOT change (${selectedProfileId}). Checking for profile data sync.`);
-            if (profile) { // Sync form fields if profile data changes externally (e.g. after save)
+            if (profile) { 
                 if (profile.title !== editableTitle) setEditableTitle(profile.title || "");
                 if ((profile.root_folder || "") !== editableRootFolder) setEditableRootFolder(profile.root_folder || "");
                 const profileIgnoreText = profile.ignore_patterns?.join("\n") || "";
@@ -318,7 +437,7 @@ function App() {
         
         prevProfileId.current = selectedProfileId;
 
-    }, [selectedProfileId, profiles]); // Removed stopFileMonitoring from here as it's handled by the dedicated monitoring effect
+    }, [selectedProfileId, profiles]); 
 
     useEffect(() => {
         if (selectedProfileId > 0) {
@@ -361,8 +480,6 @@ function App() {
                     if (status === 'done') {
                         setOutOfDateFilePaths(new Set()); 
                     }
-                     // After scan completes (done, cancelled, or failed), treeData might have changed or become null.
-                    // The main monitoring useEffect [selectedProfileId, treeData, ...] will handle restarting/stopping the monitor appropriately.
                 });
             } catch (err) { console.error("[APP] Failed to set up scan listeners:", err); setError(`Listener setup failed: ${err instanceof Error ? err.message : String(err)}`); }
         };
@@ -371,7 +488,7 @@ function App() {
             unlistenProgress?.();
             unlistenComplete?.();
         };
-    }, []); // No dependencies needed here, listeners are setup once
+    }, []); 
 
     useEffect(() => {
        const storedState = localStorage.getItem('ccb_scanState');
@@ -415,21 +532,13 @@ function App() {
             ignore_patterns: currentIgnoreArr,
         };
         try {
-            // console.log(`[APP SaveProfile] Saving profile ID ${selectedProfileId} with title: ${currentTitle}`);
             await invoke("save_code_context_builder_profile", { profile: profileToSave });
-            setProfiles(prevProfiles => { // This will trigger MainEffect to sync form fields if needed
+            setProfiles(prevProfiles => { 
                 const newUpdatedAt = new Date().toISOString();
                 return prevProfiles.map(p => {
                     if (p.id === selectedProfileId) {
-                        // If root_folder changed, the current treeData is likely invalid for monitoring.
-                        // A rescan is implicitly needed by the user.
-                        // The monitoring useEffect will re-evaluate based on current treeData.
-                        // If treeData becomes null or is for a different root, monitoring will adjust.
                         if(p.root_folder !== currentRootFolder) {
                             console.log("[App SaveProfile] Root folder changed. Current tree data may be invalid for monitoring.");
-                            // User should rescan. Current treeData is still present until rescan or profile change.
-                            // The monitoring will continue with potentially incorrect file list if not rescanned.
-                            // For simplicity, we don't clear treeData here, relying on user to rescan.
                         }
                         return {
                             ...p,
@@ -462,7 +571,6 @@ function App() {
             };
             try {
                 const newId = await invoke<number>("save_code_context_builder_profile", { profile: newProfileData });
-                // console.log(`[APP CreateProfile] New profile created with ID: ${newId}. Reloading profiles to select it.`);
                 await loadProfiles(newId); 
             }
             catch (err) { setError(`Create failed: ${err instanceof Error ? err.message : String(err)}`); }
@@ -478,7 +586,6 @@ function App() {
             localStorage.removeItem(`ccb_treeData_${selectedProfileId}`);
             localStorage.removeItem(`ccb_selectedPaths_${selectedProfileId}`);
             localStorage.removeItem(`ccb_expandedPaths_${selectedProfileId}`);
-            // stopFileMonitoring will be called by MainEffect when selectedProfileId changes (likely to 0 or another ID)
             await loadProfiles(); 
         }
         catch (err) { setError(`Delete failed: ${err instanceof Error ? err.message : String(err)}`); }
@@ -490,9 +597,6 @@ function App() {
             setError("Cannot scan: No profile selected, scan in progress, or API not ready.");
             return;
         }
-        // stopFileMonitoring is now called by the monitoring useEffect if treeData becomes null or changes.
-        // Or by the scan_complete listener indirectly if successful.
-        // For safety, ensure it's stopped before a new scan if it was running for the *current* profile.
         if(isMonitoringProfile === selectedProfileId) {
             await stopFileMonitoring();
        }
@@ -500,10 +604,9 @@ function App() {
        setIsScanning(true);
        setScanProgressPct(0);
        setCurrentScanPath("Initiating scan...");
-       // setSelectedPaths(new Set()); // <-- REMOVED to preserve selections
        setError(null);
-       setSearchTerm(""); // Clearing search term on scan is reasonable
-       setOutOfDateFilePaths(new Set()); // Stale paths should be cleared by a new scan
+       setSearchTerm(""); 
+       setOutOfDateFilePaths(new Set()); 
 
        try {
            const result = await invoke<FileNode>("scan_code_context_builder_profile", { profileId: selectedProfileId });
@@ -624,22 +727,21 @@ function App() {
     
     const treeStats = useMemo(() => calculateTreeStats(treeData), [treeData]);
 
-    // Cleanup monitor on component unmount
     useEffect(() => {
         return () => {
             console.log("[App Monitor] App unmounting, ensuring monitor is stopped.");
-            // Ensure that stopFileMonitoring is called with the *current* state of isMonitoringProfile
-            // This is best handled by calling the raw invoke if `stopFileMonitoring` itself isn't stable
-            // or if its `isMonitoringProfile` dependency might be stale in the cleanup closure.
-            // However, with `isMonitoringProfile` in `stopFileMonitoring`'s dependency array, it should be fine.
             stopFileMonitoring();
         };
-    }, [stopFileMonitoring]); // stopFileMonitoring is now stable due to its own useCallback
+    }, [stopFileMonitoring]); 
 
 
-    // JSX remains the same as previously provided
     return (
         <div className="app-container">
+            {showGlobalCopySuccess && (
+                <div className="global-copy-success-toast">
+                    Copied to clipboard!
+                </div>
+            )}
             {viewingFilePath && (
                 <FileViewerModal filePath={viewingFilePath} onClose={handleCloseModal} />
             )}
@@ -671,7 +773,6 @@ function App() {
                                 profiles={profiles}
                                 selectedProfileId={selectedProfileId}
                                 onProfileSelect={(id) => {
-                                    // console.log(`[APP ProfileManager] Profile selected via dropdown/action: ${id}`);
                                     setSelectedProfileId(id); 
                                 }}
                                 profileTitle={editableTitle}
@@ -690,7 +791,11 @@ function App() {
                         )}
                     </div>
                     <div className="left-panel-aggregator">
-                        <Aggregator selectedPaths={selectedPaths} treeData={treeData} />
+                    <Aggregator 
+                            selectedPaths={selectedPaths} 
+                            treeData={treeData} 
+                            selectedProfileId={selectedProfileId > 0 ? selectedProfileId : null}
+                        />
                     </div>
                 </div>
 
@@ -703,7 +808,7 @@ function App() {
                         >
                             {isLeftPanelCollapsed ? '▶' : '◀'}
                         </button>
-                        <h3>File Explorer</h3>
+                        <h3>File Explorer {isScanning && <span className="header-scanning-indicator">(Scanning...)</span>}</h3>
                         <button 
                             onClick={handleOpenHotkeysModal} 
                             title="View Keyboard Shortcuts" 
