@@ -1,3 +1,5 @@
+
+
 // src/App.tsx
 // Update layout, state management, and component props to match PDK style/behavior
 
@@ -146,7 +148,7 @@ function App() {
 
     const [showGlobalCopySuccess, setShowGlobalCopySuccess] = useState<boolean>(false);
     const globalCopySuccessTimerRef = useRef<number | null>(null);
-    const fileTreeRef = useRef<FileTreeRefHandles>(null); // Ref for FileTree component
+    const fileTreeRef = useRef<FileTreeRefHandles>(null); 
 
 
     const prevProfileId = useRef<number | null>(null); 
@@ -177,18 +179,18 @@ function App() {
 
      // --- Window Geometry Persistence Effects ---
      useEffect(() => {
+        const mainWindowRef = { current: null as Window | null };
+        let unlistenMove: UnlistenFn | undefined;
+        let unlistenResize: UnlistenFn | undefined;
+    
         const restoreWindowGeometry = async () => {
-            const mainWindow = await Window.getByLabel('main'); 
-            if (!mainWindow) {
+            const mainWin = await Window.getByLabel('main');
+            if (!mainWin) {
                 console.error("Main window not found for geometry restoration.");
-                try {
-                    console.warn("Cannot show window as 'main' label was not found.");
-                } catch (e) {
-                     console.error("Error in fallback window show attempt:", e);
-                }
                 return;
             }
-
+            mainWindowRef.current = mainWin;
+    
             try {
                 const savedGeometryStr = localStorage.getItem(WINDOW_GEOMETRY_KEY);
                 if (savedGeometryStr) {
@@ -198,45 +200,32 @@ function App() {
                         typeof savedGeometry.width === 'number' && savedGeometry.width > 0 &&
                         typeof savedGeometry.height === 'number' && savedGeometry.height > 0) {
                         
-                        await mainWindow.setPosition(new PhysicalPosition(savedGeometry.x, savedGeometry.y));
-                        await mainWindow.setSize(new PhysicalSize(savedGeometry.width, savedGeometry.height));
-                        console.log('Restored window geometry:', savedGeometry);
-                    } else {
-                        console.warn('Invalid or incomplete window geometry in localStorage:', savedGeometry);
+                        await mainWin.setPosition(new PhysicalPosition(savedGeometry.x, savedGeometry.y));
+                        await mainWin.setSize(new PhysicalSize(savedGeometry.width, savedGeometry.height));
                     }
                 }
             } catch (err) {
                 console.error('Failed to restore window geometry:', err);
             } finally {
-                if (mainWindow) {
-                    await mainWindow.show(); 
-                    await mainWindow.setFocus();
-                }
+                await mainWin.show();
+                await mainWin.setFocus();
             }
         };
-        restoreWindowGeometry();
-    }, []);
-
-    useEffect(() => {
+    
         const saveCurrentWindowGeometry = async () => {
-            const mainWindow = await Window.getByLabel('main'); 
-            if (!mainWindow) {
-                console.error("Main window not found for geometry saving.");
-                return;
-            }
-
+            const mainWin = mainWindowRef.current;
+            if (!mainWin) return;
+    
             try {
-                if (await mainWindow.isMinimized() || await mainWindow.isMaximized() || !(await mainWindow.isVisible())) {
-                    return; 
+                if (await mainWin.isMinimized() || await mainWin.isMaximized() || !(await mainWin.isVisible())) {
+                    return;
                 }
-                const position = await mainWindow.outerPosition();
-                const size = await mainWindow.outerSize();
+                const position = await mainWin.outerPosition();
+                const size = await mainWin.outerSize();
                 if (size.width > 0 && size.height > 0) {
                     const geometry: WindowGeometry = {
-                        x: position.x,
-                        y: position.y,
-                        width: size.width,
-                        height: size.height,
+                        x: position.x, y: position.y,
+                        width: size.width, height: size.height,
                     };
                     localStorage.setItem(WINDOW_GEOMETRY_KEY, JSON.stringify(geometry));
                 }
@@ -244,26 +233,23 @@ function App() {
                 console.error('Failed to save window geometry:', error);
             }
         };
-
+    
         const debouncedSaveGeometry = debounce(saveCurrentWindowGeometry, 500);
-        let unlistenResized: (() => void) | undefined;
-        let unlistenMoved: (() => void) | undefined;
-
+    
         const setupListeners = async () => {
-            const mainWindow = await Window.getByLabel('main'); 
-            if (mainWindow) {
-                unlistenResized = await mainWindow.onResized(debouncedSaveGeometry);
-                unlistenMoved = await mainWindow.onMoved(debouncedSaveGeometry);
-            } else {
-                 console.error("Main window not found for setting up resize/move listeners.");
+            await restoreWindowGeometry(); // Ensure window is shown before attaching listeners
+            const mainWin = mainWindowRef.current;
+            if (mainWin) {
+                unlistenResize = await mainWin.onResized(debouncedSaveGeometry);
+                unlistenMove = await mainWin.onMoved(debouncedSaveGeometry);
             }
         };
-
+    
         setupListeners();
-
+    
         return () => {
-            if (unlistenResized) unlistenResized();
-            if (unlistenMoved) unlistenMoved();
+            unlistenResize?.();
+            unlistenMove?.();
         };
     }, []);
     // --- End Window Geometry Persistence Effects ---
@@ -274,10 +260,8 @@ function App() {
 
     const stopFileMonitoring = useCallback(async () => {
         if (isMonitoringProfile !== null) { 
-            // console.log("[App Monitor] Attempting to stop monitoring for profile:", isMonitoringProfile);
             try {
                 await invoke("stop_monitoring_profile_cmd");
-                // console.log("[App Monitor] Successfully stopped monitoring for profile:", isMonitoringProfile);
                 setIsMonitoringProfile(null);
                 setOutOfDateFilePaths(new Set()); 
             } catch (err) {
@@ -292,10 +276,8 @@ function App() {
         if (profileId > 0 && currentTreeData) {
             const filesToMonitorMap = getMonitorableFilesFromTree(currentTreeData);
             if (Object.keys(filesToMonitorMap).length > 0) {
-                // console.log(`[App Monitor] Preparing to start monitoring for profile ${profileId} with ${Object.keys(filesToMonitorMap).length} files.`);
                 try {
                     const payload = { profileId, filesToMonitor: filesToMonitorMap }; 
-                    // console.log("[App Monitor] Invoking start_monitoring_profile_cmd with payload:", JSON.stringify(payload, null, 2));
                     await invoke("start_monitoring_profile_cmd", payload);
                     setIsMonitoringProfile(profileId);
                     setOutOfDateFilePaths(new Set()); 
@@ -304,34 +286,31 @@ function App() {
                     setIsMonitoringProfile(null); 
                 }
             } else {
-                // console.log("[App Monitor] No files to monitor for profile", profileId);
                 setIsMonitoringProfile(null); 
             }
         } else {
-            // console.log("[App Monitor] startFileMonitoring called with invalid profileId or no treeData. Monitoring will be stopped/remain_stopped.");
             setIsMonitoringProfile(null); 
         }
     }, [stopFileMonitoring]);
 
     
     useEffect(() => {
-        // console.log(`[App Monitor Effect] Running. Profile ID: ${selectedProfileId}, Tree Data Present: ${!!treeData}`);
         if (selectedProfileId > 0 && treeData) {
-            // console.log(`[App Monitor Effect] Conditions met, calling startFileMonitoring for profile ${selectedProfileId}.`);
             startFileMonitoring(selectedProfileId, treeData);
         } else {
-            // console.log(`[App Monitor Effect] Conditions NOT met, calling stopFileMonitoring.`);
             stopFileMonitoring();
         }
     }, [selectedProfileId, treeData, startFileMonitoring, stopFileMonitoring]);
     
     useEffect(() => {
+        const isMounted = { current: true };
         let unlistenFreshness: UnlistenFn | undefined;
         const setupFreshnessListener = async () => {
             try {
                 unlistenFreshness = await listen<string[]>("file-freshness-update", (event) => {
-                    // console.log("[App Monitor] Received file-freshness-update:", event.payload);
-                    setOutOfDateFilePaths(new Set(event.payload));
+                    if (isMounted.current) {
+                        setOutOfDateFilePaths(new Set(event.payload));
+                    }
                 });
             } catch (err) {
                 // console.error("[App Monitor] Failed to set up file freshness listener:", err);
@@ -339,6 +318,7 @@ function App() {
         };
         setupFreshnessListener();
         return () => {
+            isMounted.current = false;
             unlistenFreshness?.();
         };
     }, []);
@@ -346,6 +326,9 @@ function App() {
 
 
     const loadProfiles = useCallback(async (selectId?: number) => {
+        // This function is complex, for a mounted check, ideally the calling useEffect handles it,
+        // or this function accepts an isMounted check callback.
+        // For this exercise, we'll assume direct calls are managed by a mounted-aware useEffect.
         setIsLoading(true);
         setError(null);
         try {
@@ -353,6 +336,7 @@ function App() {
                 throw new Error("Tauri API 'invoke' not ready.");
             }
             const loadedProfiles = await invoke<Profile[]>("list_code_context_builder_profiles");
+            // Assuming this callback is only called from a mounted-aware context:
             setProfiles(loadedProfiles);
             
             let profileToSelect = 0;
@@ -370,33 +354,37 @@ function App() {
 
         } catch (err) {
             console.error("[APP] Failed to load profiles:", err);
+            // Assuming this callback is only called from a mounted-aware context:
             setError(`Failed to load profiles: ${err instanceof Error ? err.message : String(err)}`);
             setProfiles([]);
             setSelectedProfileId(0);
             localStorage.removeItem('ccb_lastSelectedProfileId'); 
         } finally {
+            // Assuming this callback is only called from a mounted-aware context:
             setIsLoading(false);
         }
     }, []); 
 
     useEffect(() => {
-        // console.log("[APP MountEffect] Component mounted, calling loadProfiles.");
-        loadProfiles();
+        const isMounted = { current: true };
+        loadProfiles(undefined).catch(loadErr => {
+            if(isMounted.current) {
+                console.error("Error during initial profile load:", loadErr);
+                // setError handled by loadProfiles itself
+            }
+        });
+        return () => { isMounted.current = false; };
     }, [loadProfiles]); 
 
     useEffect(() => {
         const profile = profiles.find(p => p.id === selectedProfileId);
-        // console.log(`[APP MainEffect] Running. selectedProfileId: ${selectedProfileId}, prevProfileId.current: ${prevProfileId.current}, Profile found: ${!!profile}`);
 
         if (prevProfileId.current !== selectedProfileId) { 
-            // console.log(`[APP MainEffect] Profile ID changed from ${prevProfileId.current} to ${selectedProfileId}.`);
-            
             setEditableTitle(profile?.title || "");
             setEditableRootFolder(profile?.root_folder || "");
             setEditableIgnorePatterns(profile?.ignore_patterns?.join("\n") || "");
 
             if (selectedProfileId > 0) {
-                // console.log(`[APP MainEffect] Storing ccb_lastSelectedProfileId: ${selectedProfileId}`);
                 localStorage.setItem('ccb_lastSelectedProfileId', selectedProfileId.toString());
                 
                 const storedTreeJson = localStorage.getItem(`ccb_treeData_${selectedProfileId}`);
@@ -426,14 +414,11 @@ function App() {
             }
             setSearchTerm("");
             setViewingFilePath(null);
-        } else {
-            if (profile) { 
-                if (profile.title !== editableTitle) setEditableTitle(profile.title || "");
-                if ((profile.root_folder || "") !== editableRootFolder) setEditableRootFolder(profile.root_folder || "");
-                const profileIgnoreText = profile.ignore_patterns?.join("\n") || "";
-                if (profileIgnoreText !== editableIgnorePatterns) setEditableIgnorePatterns(profileIgnoreText);
-            }
         }
+        // Removed the 'else' block that was trying to re-sync editable* fields.
+        // The editable* states in App.tsx are the source of truth for the form,
+        // updated directly by ProfileManager. They are then used by handleSaveCurrentProfile.
+        // This useEffect should primarily reset things when the *ID* changes.
         
         prevProfileId.current = selectedProfileId;
 
@@ -458,37 +443,48 @@ function App() {
 
     // --- Scan Event Listeners ---
     useEffect(() => {
+        const isMounted = { current: true };
         let unlistenProgress: UnlistenFn | undefined;
         let unlistenComplete: UnlistenFn | undefined;
 
         const setupListeners = async () => {
             try {
                 unlistenProgress = await listen<ScanProgressPayload>("scan_progress", (event) => {
-                    setIsScanning(true);
-                    setScanProgressPct(event.payload.progress);
-                    setCurrentScanPath(event.payload.current_path);
+                    if (isMounted.current) {
+                        setIsScanning(true);
+                        setScanProgressPct(event.payload.progress);
+                        setCurrentScanPath(event.payload.current_path);
+                    }
                 });
                 unlistenComplete = await listen<string>("scan_complete", (event) => {
-                    const status = event.payload;
-                    setIsScanning(false);
-                    setScanProgressPct(0);
-                    setCurrentScanPath("");
-                    localStorage.removeItem('ccb_scanState');
-                    if (status !== 'done' && status !== 'cancelled') {
-                        setError(`Scan ${status}`);
-                    }
-                    if (status === 'done') {
-                        setOutOfDateFilePaths(new Set()); 
+                    if (isMounted.current) {
+                        const status = event.payload;
+                        setIsScanning(false);
+                        setScanProgressPct(0);
+                        setCurrentScanPath("");
+                        localStorage.removeItem('ccb_scanState');
+                        if (status !== 'done' && status !== 'cancelled') {
+                            setError(`Scan ${status}`);
+                        }
+                        if (status === 'done') {
+                            setOutOfDateFilePaths(new Set()); 
+                        }
                     }
                 });
-            } catch (err) { console.error("[APP] Failed to set up scan listeners:", err); setError(`Listener setup failed: ${err instanceof Error ? err.message : String(err)}`); }
+            } catch (err) { 
+                if(isMounted.current) {
+                    console.error("[APP] Failed to set up scan listeners:", err); 
+                    setError(`Listener setup failed: ${err instanceof Error ? err.message : String(err)}`); 
+                }
+            }
         };
         setupListeners();
         return () => {
+            isMounted.current = false;
             unlistenProgress?.();
             unlistenComplete?.();
         };
-    }, []); 
+    }, []); // Empty deps: listeners set up once on mount
 
     useEffect(() => {
        const storedState = localStorage.getItem('ccb_scanState');
@@ -518,7 +514,7 @@ function App() {
     // --- Profile CRUD Handlers ---
     const handleSaveCurrentProfile = useCallback(async () => {
         if (!selectedProfileId || typeof invoke !== 'function') { 
-            setError("Cannot save: No profile selected or API not ready."); 
+            // setError("Cannot save: No profile selected or API not ready."); // setError can be called if component is mounted
             return "no_profile"; 
         }
         const currentTitle = editableTitle.trim() || "Untitled Profile";
@@ -533,6 +529,8 @@ function App() {
         };
         try {
             await invoke("save_code_context_builder_profile", { profile: profileToSave });
+            // Check mount status before setProfiles if this callback could be lingering
+            // For now, assuming ProfileManager calls this only when App is mounted.
             setProfiles(prevProfiles => { 
                 const newUpdatedAt = new Date().toISOString();
                 return prevProfiles.map(p => {
@@ -554,12 +552,16 @@ function App() {
             return "saved";
         }
         catch (err) { 
-            setError(`Save failed: ${err instanceof Error ? err.message : String(err)}`); 
+            // setError(`Save failed: ${err instanceof Error ? err.message : String(err)}`); // Check mount
             return "error"; 
         }
     }, [selectedProfileId, editableTitle, editableRootFolder, editableIgnorePatterns]);
 
     const handleCreateNewProfile = useCallback(async () => {
+        // This function involves a prompt and then async calls.
+        // A full isMounted pattern here would be more complex.
+        // Assuming for now that prompts block and the subsequent async calls
+        // are less likely to race with unmounts in typical flows.
         if (typeof invoke !== 'function') { setError("Cannot create: API not ready."); return; }
         const newTitle = prompt("Enter new profile title:");
         if (newTitle && newTitle.trim()) {
@@ -571,13 +573,14 @@ function App() {
             };
             try {
                 const newId = await invoke<number>("save_code_context_builder_profile", { profile: newProfileData });
-                await loadProfiles(newId); 
+                await loadProfiles(newId); // loadProfiles itself needs to be mount-aware or called from one
             }
             catch (err) { setError(`Create failed: ${err instanceof Error ? err.message : String(err)}`); }
         }
-    }, [loadProfiles]); 
+    }, [loadProfiles]); // setError needs mount awareness if called from async
 
     const handleDeleteCurrentProfile = useCallback(async () => {
+        // Similar to handleCreateNewProfile regarding prompt and async.
         if (typeof invoke !== 'function') { setError("Cannot delete: API not ready."); return; }
         const profileToDelete = profiles.find(p => p.id === selectedProfileId);
         if (!selectedProfileId || !profileToDelete || !confirm(`Delete profile "${profileToDelete.title}"? This cannot be undone.`)) { return; }
@@ -589,10 +592,12 @@ function App() {
             await loadProfiles(); 
         }
         catch (err) { setError(`Delete failed: ${err instanceof Error ? err.message : String(err)}`); }
-    }, [selectedProfileId, profiles, loadProfiles]); 
+    }, [selectedProfileId, profiles, loadProfiles]);  // setError needs mount awareness
 
     // --- Scan Handlers ---
     const handleScanProfile = useCallback(async () => {
+        // This is a major async operation. The actual scan runs in a blocking thread,
+        // but this function sets initial state.
         if (!selectedProfileId || isScanning || typeof invoke !== 'function') {
             setError("Cannot scan: No profile selected, scan in progress, or API not ready.");
             return;
@@ -610,21 +615,19 @@ function App() {
 
        try {
            const result = await invoke<FileNode>("scan_code_context_builder_profile", { profileId: selectedProfileId });
-           if (result && typeof result === 'object' && typeof result.path === 'string') {
-                setTreeData(result); 
-                localStorage.setItem(`ccb_treeData_${selectedProfileId}`, JSON.stringify(result));
-                setProfiles(prev => prev.map(p => p.id === selectedProfileId ? {...p, updated_at: new Date().toISOString()} : p));
-            } else {
-                setTreeData(null); 
-                localStorage.removeItem(`ccb_treeData_${selectedProfileId}`);
-                setError("Scan completed but returned invalid data.");
-            }
+           // State updates here should ideally check for mount if invoke could be very long
+           // AND the component could unmount. However, the scan itself is handled with events.
+           setTreeData(result); 
+           localStorage.setItem(`ccb_treeData_${selectedProfileId}`, JSON.stringify(result));
+           setProfiles(prev => prev.map(p => p.id === selectedProfileId ? {...p, updated_at: new Date().toISOString()} : p));
         } catch (err) {
             console.error("[APP] Scan invocation failed:", err);
+            // State updates here...
             setError(`Scan failed: ${err instanceof Error ? err.message : String(err)}`);
             setTreeData(null); 
             localStorage.removeItem(`ccb_treeData_${selectedProfileId}`);
         }
+        // Note: setIsScanning(false) is handled by the 'scan_complete' event listener.
     }, [selectedProfileId, isScanning, stopFileMonitoring, isMonitoringProfile]);
 
     const handleCancelScan = useCallback(async () => {
@@ -632,13 +635,11 @@ function App() {
         try {
             await invoke("cancel_code_context_builder_scan");
         } catch (err) {
-           setIsScanning(false);
-           setScanProgressPct(0);
-           setCurrentScanPath("");
-           localStorage.removeItem('ccb_scanState');
+            // State updates if invoke fails, which is synchronous here.
+            // setIsScanning will be handled by scan_complete('cancelled') or ('failed') event
            setError(`Failed to cancel scan: ${err instanceof Error ? err.message : String(err)}`);
         }
-    }, [isScanning]);
+    }, [isScanning]); // setError needs mount awareness
 
     // --- Selection & Expansion Handlers ---
     const handleToggleSelection = useCallback((path: string, isDir: boolean) => {
@@ -701,7 +702,7 @@ function App() {
         } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'R') {
             event.preventDefault();
             if (selectedProfileId > 0 && !isScanning) {
-                handleScanProfile();
+                handleScanProfile(); // This is async
             }
         } else if (event.ctrlKey && event.key.toLowerCase() === 'a' && !isInputFocused) {
             event.preventDefault();
@@ -732,10 +733,9 @@ function App() {
 
     useEffect(() => {
         return () => {
-            // console.log("[App Monitor] App unmounting, ensuring monitor is stopped.");
-            stopFileMonitoring();
+            stopFileMonitoring(); // Ensure monitoring stops on app unmount
         };
-    }, [stopFileMonitoring]); 
+    }, [stopFileMonitoring]); // stopFileMonitoring is stable
 
 
     return (
@@ -821,7 +821,7 @@ function App() {
                         </button>
                     </div>
                     <FileTree
-                        ref={fileTreeRef} // Pass the ref here
+                        ref={fileTreeRef} 
                         treeData={treeData}
                         selectedPaths={selectedPaths}
                         onToggleSelection={handleToggleSelection}

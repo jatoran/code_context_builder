@@ -135,7 +135,7 @@ pub fn stop_monitoring_profile_cmd(
         .map_err(|e| format!("Failed to lock monitor state: {}", e))?;
 
     if state_guard.current_profile_id.is_some() {
-        println!("[Monitor CMD] Stopping monitoring for profile ID: {:?}", state_guard.current_profile_id.unwrap());
+        // println!("[Monitor CMD] Stopping monitoring for profile ID: {:?}", state_guard.current_profile_id.unwrap());
     } else {
         // println!("[Monitor CMD] Stop monitoring called, but no profile was being monitored.");
     }

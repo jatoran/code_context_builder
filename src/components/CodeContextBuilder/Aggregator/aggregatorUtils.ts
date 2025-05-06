@@ -238,7 +238,7 @@ export function generateFullScannedFileTree(
     const initialDisplayName = rootNode.is_dir && !rootNode.name.endsWith('/') ? `${rootNode.name}/` : rootNode.name;
 
     if (format === 'markdown') {
-        treeString = `# Full Scanned File Tree\n\n`;
+        treeString = `# File Tree\n\n`;
         treeString += `${rootNode.is_dir ? '📁' : '📄'} ${escapeXml(initialDisplayName)}\n`;
     } else if (format === 'xml') {
         treeString = `<fileTree type="full">\n`;
@@ -247,7 +247,7 @@ export function generateFullScannedFileTree(
         treeString += `</fileTree>\n`;
         return treeString; // Return early for XML as its root structure is different
     } else if (format === 'raw') {
-        treeString = `Full Scanned File Tree (Raw Text):\n\n`; // Header for raw tree
+        treeString = `File Tree (Raw Text):\n\n`; // Header for raw tree
         treeString += `${escapeXml(initialDisplayName)}\n`; // Root node name for raw tree
     }
 
