@@ -24,6 +24,7 @@ interface FileTreeNodeProps {
     outOfDateFilePaths: Set<string>; 
 }
 
+
 const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
     node,
     selectedPaths, 
@@ -156,9 +157,11 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
     const isHighlighted = searchTerm.length > 0 && highlightedPath === node.path;
 
     const nodeClasses = ['file-tree-node'];
-    if (isHighlighted) nodeClasses.push('highlighted');
-    // Apply 'dir-contains-stale' regardless of isOpen if the directory itself has stale descendants
+    if (isHighlighted) nodeClasses.push('highlighted'); // For search term match
     if (node.is_dir && hasStaleDescendants) nodeClasses.push('dir-contains-stale');
+    if (checkboxState === 'checked') { // For selection highlight
+        nodeClasses.push('selected');
+    }
 
 
     return (

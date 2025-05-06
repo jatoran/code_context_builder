@@ -1,5 +1,6 @@
 
 
+
 :root {
   /* Basic theme variables */
   --bg-color: #1e1e1e;
@@ -477,13 +478,24 @@ label {
     padding-left: calc(var(--node-level, 0) * 20px);
     border-radius: 3px;
     margin: 1px 4px 1px 4px;
+    transition: background-color 0.15s ease-in-out; /* Smooth transition for highlights */
 }
 .file-tree-node:hover {
     background-color: rgba(255, 255, 255, 0.05);
 }
-.file-tree-node.highlighted {
-    background-color: #444;
+.file-tree-node.highlighted { /* Search term highlight */
+    background-color: #444; /* This is a darker highlight for search, distinct from selection */
 }
+.file-tree-node.selected { /* New: Selected item highlight */
+    background-color: rgba(var(--accent-color-rgb), 0.2); /* Subtle accent color */
+}
+.file-tree-node.selected:hover {
+    background-color: rgba(var(--accent-color-rgb), 0.3); /* Slightly more on hover */
+}
+/* If both selected and highlighted (search), the search highlight on .node-name might be more specific or last one wins */
+/* The .node-name.highlight is more specific for text, row bg can be for selection */
+
+
 .node-toggle {
     cursor: pointer;
     width: 1em;
@@ -813,7 +825,14 @@ label {
 
 
   .file-tree-node:hover { background-color: rgba(0, 0, 0, 0.03); }
-  .file-tree-node.highlighted { background-color: #eee; }
+  .file-tree-node.highlighted { background-color: #eee; } /* Search term highlight */
+  .file-tree-node.selected { /* New: Selected item highlight for light theme */
+      background-color: rgba(var(--accent-color-rgb), 0.15);
+  }
+  .file-tree-node.selected:hover {
+      background-color: rgba(var(--accent-color-rgb), 0.25);
+  }
+
   .node-name.highlight { background-color: var(--highlight-background-color); color: var(--highlight-text-color); }
   .file-tree-node .node-name.stale { color: var(--danger-color); }
   .file-tree-node.dir-contains-stale > .node-icon { opacity: 0.7; }
