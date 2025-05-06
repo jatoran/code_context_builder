@@ -190,6 +190,80 @@ function buildFormattedTreeRecursiveInternal(
 }
 
 
+// --- New functions for generating the FULL scanned tree ---
+
+function buildFullFormattedTreeRecursiveInternal(
+    node: FileNode,
+    format: OutputFormat,
+    depth: number,
+    isLastChildStack: boolean[]
+): string {
+    let output = '';
+
+    // Determine prefix for Markdown based on depth and whether parent was last child
+    if (format === 'markdown') {
+        let prefix = '';
+        for (let i = 0; i < depth -1; i++) {
+            prefix += isLastChildStack[i] ? '    ' : '│   ';
+        }
+        if (depth > 0) {
+            prefix += isLastChildStack[depth - 1] ? '└── ' : '├── ';
+        }
+        output += `${prefix}${node.is_dir ? '📁' : '📄'} ${escapeXml(node.name)}${node.is_dir ? '/' : ''}\n`;
+    } else if (format === 'xml') {
+        const indent = '  '.repeat(depth);
+        if (node.is_dir) {
+            output += `${indent}<folder name="${escapeXml(node.name)}" path="${escapeXml(node.path)}">\n`;
+        } else {
+            // For a full tree, files also get their own tags, similar to selected tree.
+            output += `${indent}<file name="${escapeXml(node.name)}" path="${escapeXml(node.path)}" />\n`;
+        }
+    }
+
+    // Process children if it's a directory
+    if (node.is_dir && node.children) {
+        // Sort all children (files first, then dirs, then alphabetically)
+        const sortedChildren = [...node.children].sort((a, b) => {
+            if (!a.is_dir && b.is_dir) return -1; // Files before directories
+            if (a.is_dir && !b.is_dir) return 1;  // Directories after files
+            return a.name.localeCompare(b.name); // Alphabetical for same types
+        });
+
+        sortedChildren.forEach((child, index) => {
+            const newIsLastChildStack = [...isLastChildStack, index === sortedChildren.length - 1];
+            output += buildFullFormattedTreeRecursiveInternal(child, format, depth + 1, newIsLastChildStack);
+        });
+    }
+
+    // Close folder tag for XML
+    if (format === 'xml' && node.is_dir) {
+        output += `${'  '.repeat(depth)}</folder>\n`;
+    }
+
+    return output;
+}
+
+export function generateFullScannedFileTree(
+    rootNode: FileNode | null, // Allow rootNode to be null
+    format: OutputFormat
+): string {
+    if (!rootNode) return "";
+
+    let treeString = "";
+    if (format === 'markdown') {
+        treeString = `# Full Scanned File Tree\n\n`;
+        treeString += buildFullFormattedTreeRecursiveInternal(rootNode, format, 0, []);
+    } else if (format === 'xml') {
+        treeString = `<fileTree type="full">\n`; // Add type attribute for clarity
+        treeString += buildFullFormattedTreeRecursiveInternal(rootNode, format, 0, []);
+        treeString += `</fileTree>\n`;
+    }
+    return treeString;
+}
+
+// --- End new functions ---
+
+
 export function generateFormattedFileTree(
     rootNode: FileNode,
     selectedPaths: Set<string>,

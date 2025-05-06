@@ -1,3 +1,4 @@
+
 // src/components/CodeContextBuilder/StatusBar.tsx
 // Update styling and date formatting to match PDK
 
@@ -13,6 +14,7 @@ interface TreeStats {
 interface StatusBarProps {
     stats: TreeStats;
     lastScanTime: string | null | undefined; // From Profile.updated_at
+    outOfDateFileCount: number; // New prop
 }
 
 // Helper to format ISO date string or return 'N/A' (matches PDK style)
@@ -40,7 +42,7 @@ function getDurationSince(dateString: string | null | undefined): string {
     }
 }
 
-const StatusBar: React.FC<StatusBarProps> = ({ stats, lastScanTime }) => {
+const StatusBar: React.FC<StatusBarProps> = ({ stats, lastScanTime, outOfDateFileCount }) => {
     const formattedTime = getDurationSince(lastScanTime);
 
     return (
@@ -53,6 +55,11 @@ const StatusBar: React.FC<StatusBarProps> = ({ stats, lastScanTime }) => {
                 {stats.lines > 0 && <span className="stat-lines">Lines: {stats.lines.toLocaleString()}</span>}
                 {stats.tokens > 0 && <span className="stat-tokens">~Tokens: {stats.tokens.toLocaleString()}</span>}
                  {stats.files === 0 && stats.folders === 0 && <span>No items scanned</span>}
+                 {outOfDateFileCount > 0 && (
+                    <span className="status-warning" title={`${outOfDateFileCount} file${outOfDateFileCount === 1 ? '' : 's'} modified since last scan.`}>
+                        (Scan Outdated!)
+                    </span>
+                 )}
             </div>
             <div className="status-bar-right">
                  {/* Display formatted last scan time */}

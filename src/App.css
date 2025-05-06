@@ -1,11 +1,10 @@
 
+
 :root {
   /* Basic theme variables */
   --bg-color: #1e1e1e;
   --text-color: #ffffff;
   --accent-color: #396cd8;
-  --active-tab-bg-color: #4a7ed0; /* New active tab background color */
-  --active-tab-border-color: #4a7ed0; /* New active tab border color */
   --border-color: #3a3a3a;
   --card-bg-color: #2b2b2b;
   --card-bg-color2: #272727;
@@ -199,7 +198,7 @@ button {
   border: 1px solid var(--border-color);
   padding: 0.5rem 1rem; /* PDK padding */
   border-radius: 6px; /* PDK radius */
-  transition: background-color var(--transition-speed), border-color var(--transition-speed);
+  transition: background-color var(--transition-speed), border-color var(--transition-speed), color var(--transition-speed);
   margin: 0 4px; /* Default spacing */
   font-size: 0.9em; /* Slightly smaller base button font */
 }
@@ -272,7 +271,6 @@ label {
   display: flex;
   flex-direction: column;
   gap: 0.8em; /* Reduced gap */
-  /* margin-bottom: 1em; Space below is handled by parent or aggregator */
 }
 .profile-manager h3 {
     margin-bottom: 0.5em; /* Space below heading */
@@ -296,6 +294,17 @@ label {
     margin: 0;
     line-height: 1; /* Better icon alignment */
 }
+.profile-controls button.scan-btn-stale {
+    /* Indication for stale scan */
+    border-color: var(--danger-color);
+    color: var(--danger-color);
+}
+.profile-controls button.scan-btn-stale:hover {
+    background-color: var(--danger-color);
+    border-color: var(--danger-color);
+    color: var(--text-color); /* White text on red background for hover */
+}
+
 
 /* Profile Form Styling (using PDK classes/structure) */
 .profile-form {
@@ -375,13 +384,12 @@ label {
 /* --------------------------------------------------------------------------
    File Tree Area (in file-tree-main-content)
    -------------------------------------------------------------------------- */
-.file-tree-container { /* This class might be on a child of file-tree-main-content if FileTree has its own wrapper */
-    width: 100%; /* Takes full width of parent */
+.file-tree-container { 
+    width: 100%; 
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    /* border-right: 1px solid var(--border-secondary-color); REMOVED, border is on left-panel */
-    height: 100%; /* Takes full height of parent flex item */
+    height: 100%; 
     box-sizing: border-box;
 }
 
@@ -462,27 +470,38 @@ label {
 .node-stats .time { color: #6ebbf0; }
 .node-stats .selected-count { color: #f0b76e; }
 
+/* Styles for stale/out-of-date files */
+.file-tree-node .node-name.stale {
+  color: var(--danger-color);
+  /* font-style: italic; */ /* Optional: further differentiate */
+}
+.file-tree-node.dir-contains-stale > .node-icon {
+  /* filter: hue-rotate(120deg) saturate(0.5); */ /* Example: greenish tint */
+  opacity: 0.7;
+}
+.file-tree-node.dir-contains-stale > .node-name:not(.stale) {
+    /* If dir name itself is not stale, but contains stale children */
+    color: #ffcc80; /* Muted orange/yellow for directory containing stale items */
+    /* opacity: 0.8; */
+}
+
 
 /* --------------------------------------------------------------------------
    Aggregator Panel (in Left Panel)
    -------------------------------------------------------------------------- */
-/* .right-panel-container styling from original App.css is effectively applied to .left-panel-aggregator now */
 .left-panel-aggregator {
-    /* flex: 1; This is set on .left-panel-aggregator itself */
     display: flex;
     flex-direction: column;
-    /* overflow: auto; Handled by children now or specific elements like textarea */
-    /* padding: 1em; Set by .left-panel > div */
-    height: 100%; /* Crucial for textarea to fill space */
+    height: 100%; 
     box-sizing: border-box;
     gap: 0.5em;
 }
 
 .aggregator-header {
     display: flex;
-    flex-direction: column; /* Stack title and controls */
+    flex-direction: column; 
     gap: 0.5em;
-    align-items: flex-start; /* Align items to the start */
+    align-items: flex-start; 
     flex-shrink: 0;
     padding-bottom: 0.5em;
     border-bottom: 1px solid var(--border-secondary-color);
@@ -491,24 +510,24 @@ label {
     margin: 0;
     font-size: 1.1em;
 }
-.aggregator-controls { /* Wrapper for format select, prepend checkbox, and stats */
+.aggregator-controls { 
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.8em; /* Spacing between control groups */
-    width: 100%; /* Take full width */
+    gap: 0.8em; 
+    width: 100%; 
 }
-.aggregator-header span { /* Style for token count etc */
+.aggregator-header span { 
     font-size: 0.9em;
     color: var(--label-text-color);
-    margin-left: auto; /* Push stats to the right if on same line */
+    margin-left: auto; 
 }
 
 .aggregator-content {
-    flex-grow: 1; /* Take all available vertical space */
+    flex-grow: 1; 
     width: 100%;
     box-sizing: border-box;
-    background-color: var(--input-background-color); /* Match input bg */
+    background-color: var(--input-background-color); 
     color: var(--text-color);
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -559,6 +578,11 @@ label {
 .status-bar .stat-lines { color: #6ef076; }
 .status-bar .stat-tokens { color: #f0b76e; }
 .status-bar .stat-time { color: #6ebbf0; }
+.status-bar .status-warning { /* For stale scan indication */
+    color: var(--danger-color);
+    font-weight: bold;
+    margin-left: 0.5em; /* Adjust spacing as needed */
+}
 
 
 /* ==========================================================================
@@ -665,6 +689,15 @@ label {
   button.delete-btn { background-color: var(--danger-color); border-color: var(--danger-color); color: #fff; }
   button.delete-btn:hover { background-color: #b00; border-color: #b00; }
   button:disabled { background-color: #e0e0e0; border-color: #d0d0d0; color: #999; }
+  .profile-controls button.scan-btn-stale {
+      border-color: var(--danger-color);
+      color: var(--danger-color);
+  }
+  .profile-controls button.scan-btn-stale:hover {
+      background-color: var(--danger-color);
+      border-color: var(--danger-color);
+      color: var(--bg-color); /* Ensure contrast on hover for light theme */
+  }
 
   .left-panel { border-right-color: var(--border-color); background-color: var(--left-panel-bg-color); }
   .left-panel-profile-manager { border-bottom-color: var(--border-color); }
@@ -679,10 +712,16 @@ label {
   .search-container { border-bottom-color: var(--border-secondary-color); }
   .aggregator-header { border-bottom-color: var(--border-secondary-color); }
   .status-bar { background-color: #f0f0f0; border-top-color: var(--border-color); color: #555; }
+  .status-bar .status-warning { color: var(--danger-color); }
+
 
   .file-tree-node:hover { background-color: rgba(0, 0, 0, 0.03); }
   .file-tree-node.highlighted { background-color: #eee; }
   .node-name.highlight { background-color: var(--highlight-background-color); color: var(--highlight-text-color); }
+  .file-tree-node .node-name.stale { color: var(--danger-color); }
+  .file-tree-node.dir-contains-stale > .node-icon { opacity: 0.7; }
+  .file-tree-node.dir-contains-stale > .node-name:not(.stale) { color: #d66f00; } /* Adjusted orange for light theme */
+
 
   .scan-overlay { color: #333; }
   .scan-indicator { background-color: var(--background-tertiary-color); border: 1px solid var(--border-color); }

@@ -1,8 +1,8 @@
+
 // src/components/CodeContextBuilder/FileTree/FileTreeNode.tsx
 
 import React, { useMemo, useCallback } from "react";
-import { FileNode } from '../../../types/scanner'; // Use standalone types
-// Import helpers from the new utility file
+import { FileNode } from '../../../types/scanner'; 
 import {
     getAllDescendantFilePaths,
     nodeOrDescendantMatches,
@@ -11,51 +11,46 @@ import {
 
 interface FileTreeNodeProps {
     node: FileNode;
-    selectedPaths: Set<string>; // USE selectedPaths directly
+    selectedPaths: Set<string>; 
     onToggleSelection: (path: string, isDir: boolean) => void;
     level: number;
     searchTerm: string;
     onViewFile: (path: string) => void;
-    initiallyOpen?: boolean;
     expandedPaths: Set<string>;
     onToggleExpand: (path: string) => void;
     highlightedPath?: string;
+    outOfDateFilePaths: Set<string>; // New prop
 }
 
-// Use React.memo for performance, similar to PDK
 const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
     node,
-    selectedPaths, // USE selectedPaths directly
+    selectedPaths, 
     onToggleSelection,
     level,
     searchTerm,
     onViewFile,
-    // initiallyOpen = false, // This prop is less relevant now expansion is managed higher up / by search
     expandedPaths,
     onToggleExpand,
     highlightedPath,
+    outOfDateFilePaths, // Destructure new prop
 }) => {
 
-     // --- Search term matching ---
      const lowerSearchTerm = searchTerm.toLowerCase();
      const doesNodeMatchSearch = useMemo(() =>
          searchTerm ? node.name.toLowerCase().includes(lowerSearchTerm) : false,
          [node.name, lowerSearchTerm, searchTerm]
      );
      const isVisible = useMemo(() =>
-         nodeOrDescendantMatches(node, searchTerm), // Use imported helper
+         nodeOrDescendantMatches(node, searchTerm), 
          [node, searchTerm]
      );
-     // --- Expansion State ---
-     // Node is expanded if its path is in the expandedPaths set OR if search term forces it
+     
      const isOpen = useMemo(() => {
          const isExplicitlyExpanded = expandedPaths.has(node.path);
          const isSearchForcedOpen = !!searchTerm && isVisible && node.is_dir;
          return isExplicitlyExpanded || isSearchForcedOpen;
      }, [expandedPaths, node.path, searchTerm, isVisible, node.is_dir]);
 
-
-    // --- Handlers ---
     const handleToggleOpen = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         if (node.is_dir) {
@@ -77,23 +72,18 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
             onToggleSelection(node.path, node.is_dir);
         }
     }, [node.path, node.is_dir, onToggleSelection, onViewFile]);
-    // ---------------
-
-    // --- Checkbox State (checked, unchecked, indeterminate) ---
+    
     const checkboxState = useMemo(() => {
         if (!node.is_dir) {
-            // Use selectedPaths.has()
             return selectedPaths.has(node.path) ? 'checked' : 'unchecked';
         }
-        // Use imported helper
         const descendantFiles = getAllDescendantFilePaths(node);
         const totalDescendantFiles = descendantFiles.length;
 
-        if (totalDescendantFiles === 0) return 'none'; // No checkbox for empty dir
+        if (totalDescendantFiles === 0) return 'none'; 
 
         let selectedDescendantCount = 0;
         for (const filePath of descendantFiles) {
-             // Use selectedPaths.has()
             if (selectedPaths.has(filePath)) {
                 selectedDescendantCount++;
             }
@@ -103,25 +93,36 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
         if (selectedDescendantCount === totalDescendantFiles) return 'checked';
         return 'indeterminate';
 
-    }, [node, selectedPaths]); // Depend on selectedPaths
-    // -------------------------------------------------------
+    }, [node, selectedPaths]); 
 
-    // --- Filtering based on search ---
+    // --- Stale File Indication ---
+    const isNodeStale = useMemo(() => 
+        !node.is_dir && outOfDateFilePaths.has(node.path),
+    [node, outOfDateFilePaths]);
+
+    const hasStaleDescendants = useMemo(() => {
+        if (!node.is_dir || !isOpen) return false; // Only check for open directories
+        const descendantFiles = getAllDescendantFilePaths(node);
+        return descendantFiles.some(path => outOfDateFilePaths.has(path));
+    }, [node, isOpen, outOfDateFilePaths]);
+    // --- End Stale File Indication ---
+
     if (searchTerm && !isVisible) {
         return null;
     }
-    // --- Highlight based on keyboard nav ---
     const isHighlighted = searchTerm.length > 0 && highlightedPath === node.path;
 
-    // --- RENDER ---
+    const nodeClasses = ['file-tree-node'];
+    if (isHighlighted) nodeClasses.push('highlighted');
+    if (hasStaleDescendants) nodeClasses.push('dir-contains-stale');
+
     return (
         <li
             className={`file-tree-node-li`}
             style={{ '--node-level': level } as React.CSSProperties}
-            data-file-path={node.path} // Add data attribute for scrolling
+            data-file-path={node.path} 
         >
-            <div className={`file-tree-node ${isHighlighted ? 'highlighted' : ''}`}>
-                {/* Toggle Button */}
+            <div className={nodeClasses.join(' ')}>
                 {node.is_dir && node.children && node.children.length > 0 ? (
                     <span className="node-toggle" onClick={handleToggleOpen} aria-label={isOpen ? "Collapse" : "Expand"}>
                         {isOpen ? '▼' : '▶'}
@@ -130,7 +131,6 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                     <span className="node-toggle-placeholder"></span>
                 )}
 
-                {/* Checkbox */}
                 {checkboxState !== 'none' ? (
                      <input
                          type="checkbox"
@@ -145,38 +145,32 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                       <span className="node-checkbox-placeholder"></span>
                  )}
 
-                {/* Icon */}
                 <span className="node-icon" role="img" aria-label={node.is_dir ? "Folder" : "File"}>{node.is_dir ? '📁' : '📄'}</span>
 
-                {/* Name */}
                 <span
-                    title={node.path + (node.is_dir ? '' : '\n(Shift+Click to view, Click to select/deselect)')}
-                    className={`node-name ${doesNodeMatchSearch ? 'highlight' : ''}`}
+                    title={node.path + (node.is_dir ? '' : '\n(Shift+Click to view, Click to select/deselect)') + (isNodeStale ? '\n(File modified since last scan)' : '')}
+                    className={`node-name ${doesNodeMatchSearch ? 'highlight' : ''} ${isNodeStale ? 'stale' : ''}`}
                     onClick={handleNameClick}
                 >
                     {node.name}
                 </span>
 
-                {/* Stats (Aligned Right) */}
                 <span className="node-stats">
                     {!node.is_dir && (
                         <>
                           {node.lines > 0 && <span className="lines">{node.lines}L</span>}
                           {node.tokens > 0 && <span className="tokens">{node.tokens}T</span>}
-                          {/* Use imported helper */}
                           {node.last_modified && <span className="time">{formatTimeAgo(node.last_modified)}</span>}
                         </>
                     )}
                      {node.is_dir && checkboxState === 'indeterminate' && (
                          <span className="selected-count">
-                            {/* Use imported helper */}
                              ({getAllDescendantFilePaths(node).filter(p => selectedPaths.has(p)).length} sel.)
                          </span>
                      )}
                 </span>
             </div>
 
-            {/* Children */}
             {node.is_dir && isOpen && node.children && node.children.length > 0 && (
                 <ul className="file-tree" role="group">
                     {node.children.map((child) => (
@@ -184,15 +178,15 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                             <FileTreeNodeComponent
                                 key={child.path}
                                 node={child}
-                                selectedPaths={selectedPaths} // Pass down
+                                selectedPaths={selectedPaths} 
                                 onToggleSelection={onToggleSelection}
                                 level={level + 1}
                                 searchTerm={searchTerm}
                                 onViewFile={onViewFile}
-                                // initiallyOpen={false} // Removed
                                 expandedPaths={expandedPaths}
                                 onToggleExpand={onToggleExpand}
                                 highlightedPath={highlightedPath}
+                                outOfDateFilePaths={outOfDateFilePaths} // Pass down
                             />
                         ) : null
                     ))}

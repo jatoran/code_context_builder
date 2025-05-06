@@ -7,7 +7,8 @@ import {
     formatFileContent,
     formatFolderHeader,
     formatFolderFooter,
-    generateFormattedFileTree,
+    generateFormattedFileTree, // For selection-based tree (if ever needed again directly)
+    generateFullScannedFileTree, // For full scanned tree
     getLanguageFromPath,
 } from '../components/CodeContextBuilder/Aggregator/aggregatorUtils';
 
@@ -102,7 +103,7 @@ export function useAggregator({ treeData, selectedPaths }: UseAggregatorProps): 
         let finalOutput = '';
 
         if (prependFileTree) {
-            finalOutput += generateFormattedFileTree(treeData, selectedPaths, selectedFormat);
+            finalOutput += generateFullScannedFileTree(treeData, selectedFormat);
             finalOutput += "\n\n"; 
         }
 

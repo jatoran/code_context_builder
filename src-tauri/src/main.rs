@@ -1,3 +1,4 @@
+
 // src-tauri/src/main.rs
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -10,22 +11,21 @@ mod scan_cache;
 mod scan_state;
 mod scan_tree;
 mod utils;
+mod file_monitor; // Added file_monitor module
 
 // Import necessary items
 use db::{AppState, init_connection, init_db_tables};
 use std::sync::{Arc, Mutex};
-// --- ADD THIS LINE BACK (if removed previously) ---
 use tauri::Manager; // Needed for app.manage()
-// -------------------------------------------------
 
 fn main() {
     let context = tauri::generate_context!();
 
     tauri::Builder::default()
         .setup(|app| {
-            let app_handle = app.handle();
+            let app_handle = app.handle().clone();
 
-            let conn = match init_connection(app_handle) {
+            let conn = match init_connection(&app_handle) {
                 Ok(c) => c,
                 Err(e) => {
                     eprintln!("FATAL: DB connection failed during setup: {}", e);
@@ -38,9 +38,18 @@ fn main() {
                  panic!("DB table init failed: {}", e);
             }
 
-            let app_state = AppState { conn: Arc::new(Mutex::new(conn)) };
-            // This call requires the Manager trait to be in scope
-            app.manage(app_state); // Manage state within the app
+            let app_db_state = AppState { conn: Arc::new(Mutex::new(conn)) };
+            app.manage(app_db_state);
+
+            // Initialize and manage MonitorState
+            let monitor_state = Arc::new(Mutex::new(file_monitor::MonitorState::default()));
+            app.manage(monitor_state.clone());
+
+            // Spawn the monitoring thread
+            let app_handle_for_monitor_thread = app_handle.clone();
+            std::thread::spawn(move || {
+                file_monitor::monitoring_thread_function(app_handle_for_monitor_thread, monitor_state);
+            });
 
             Ok(())
         })
@@ -52,7 +61,9 @@ fn main() {
             scanner::scan_code_context_builder_profile,
             scanner::cancel_code_context_builder_scan,
             scanner::read_file_contents,
-            utils::get_text_token_count
+            utils::get_text_token_count,
+            file_monitor::start_monitoring_profile_cmd, // Added command
+            file_monitor::stop_monitoring_profile_cmd   // Added command
         ])
         .run(context)
         .expect("error while running tauri application");

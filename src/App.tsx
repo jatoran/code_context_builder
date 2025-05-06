@@ -1,3 +1,4 @@
+
 // src/App.tsx
 // Update layout, state management, and component props to match PDK style/behavior
 
@@ -21,6 +22,11 @@ interface ScanProgressPayload {
     current_path: string;
 }
 
+interface MonitoredFile {
+    last_modified: string;
+    size: number; // Rust uses u64, TS number is fine for typical sizes
+}
+
 // --- Tree Traversal & Stat Helpers (Adapted from Standalone/PDK) ---
 const getAllFilePaths = (node: FileNode | null): string[] => {
     if (!node) return [];
@@ -35,6 +41,24 @@ const getAllFilePaths = (node: FileNode | null): string[] => {
     }
     return paths;
 };
+
+const getMonitorableFilesFromTree = (node: FileNode | null): Record<string, MonitoredFile> => {
+    const files: Record<string, MonitoredFile> = {};
+    function traverse(currentNode: FileNode) {
+        if (!currentNode.is_dir) {
+            files[currentNode.path] = { 
+                last_modified: currentNode.last_modified, 
+                size: currentNode.size 
+            };
+        }
+        if (currentNode.children) {
+            currentNode.children.forEach(traverse);
+        }
+    }
+    if (node) traverse(node);
+    return files;
+};
+
 
 interface TreeStats {
     files: number;
@@ -66,6 +90,7 @@ const calculateTreeStats = (node: FileNode | null): TreeStats => {
 };
 // --- End Helpers ---
 
+
 function App() {
     const [profiles, setProfiles] = useState<Profile[]>([]);
     const [selectedProfileId, setSelectedProfileId] = useState<number>(0); 
@@ -89,51 +114,134 @@ function App() {
     const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState<boolean>(() => {
         try { return localStorage.getItem('ccb_isLeftPanelCollapsed') === 'true'; } catch { return false; }
     });
-    const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState<boolean>(false); // Added for Hotkeys Modal
+    const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState<boolean>(false); 
+    const [outOfDateFilePaths, setOutOfDateFilePaths] = useState<Set<string>>(new Set()); // For file freshness
 
-    const prevProfileId = useRef<number | null>(null); // Initialized to null
+    const prevProfileId = useRef<number | null>(null); 
 
     const selectedProfile = useMemo(() => profiles.find(p => p.id === selectedProfileId), [profiles, selectedProfileId]);
+
+    // --- File Monitoring Control ---
+    const [isMonitoringProfile, setIsMonitoringProfile] = useState<number | null>(null);
+
+    const stopFileMonitoring = useCallback(async () => {
+        // Check isMonitoringProfile directly, not a stale closure version
+        if (isMonitoringProfile !== null) { 
+            console.log("[App Monitor] Attempting to stop monitoring for profile:", isMonitoringProfile);
+            try {
+                await invoke("stop_monitoring_profile_cmd");
+                console.log("[App Monitor] Successfully stopped monitoring for profile:", isMonitoringProfile);
+                setIsMonitoringProfile(null);
+                setOutOfDateFilePaths(new Set()); // Clear stale paths when stopping
+            } catch (err) {
+                console.error("[App Monitor] Failed to stop file monitoring for profile " + isMonitoringProfile + ":", err);
+            }
+        } else {
+            // console.log("[App Monitor] stopFileMonitoring called, but no profile was being monitored.");
+        }
+    }, [isMonitoringProfile]); // Depends on the current value of isMonitoringProfile
+
+    const startFileMonitoring = useCallback(async (profileId: number, currentTreeData: FileNode | null) => {
+        // Always stop previous before starting new, even if profileId is the same (e.g. treeData reloaded)
+        await stopFileMonitoring(); 
+        
+        if (profileId > 0 && currentTreeData) {
+            const filesToMonitorMap = getMonitorableFilesFromTree(currentTreeData);
+            if (Object.keys(filesToMonitorMap).length > 0) {
+                console.log(`[App Monitor] Preparing to start monitoring for profile ${profileId} with ${Object.keys(filesToMonitorMap).length} files.`);
+                try {
+                    // Use camelCase for the key to match the #[serde(alias = "...")] in Rust
+                    const payload = { profileId, filesToMonitor: filesToMonitorMap }; // ALREADY camelCase
+                    console.log("[App Monitor] Invoking start_monitoring_profile_cmd with payload:", JSON.stringify(payload, null, 2));
+                    await invoke("start_monitoring_profile_cmd", payload);
+                    setIsMonitoringProfile(profileId);
+                    setOutOfDateFilePaths(new Set()); 
+                } catch (err) {
+                    console.error("[App Monitor] Failed to start file monitoring for profile " + profileId + ":", err);
+                    setIsMonitoringProfile(null); 
+                }
+            } else {
+                console.log("[App Monitor] No files to monitor for profile", profileId);
+                setIsMonitoringProfile(null); 
+            }
+        } else {
+            console.log("[App Monitor] startFileMonitoring called with invalid profileId or no treeData. Monitoring will be stopped/remain_stopped.");
+            setIsMonitoringProfile(null); 
+        }
+    }, [stopFileMonitoring]);
+
+    
+    // Effect to manage monitoring when selected profile or tree data changes
+    useEffect(() => {
+        console.log(`[App Monitor Effect] Running. Profile ID: ${selectedProfileId}, Tree Data Present: ${!!treeData}`);
+        if (selectedProfileId > 0 && treeData) {
+            console.log(`[App Monitor Effect] Conditions met, calling startFileMonitoring for profile ${selectedProfileId}.`);
+            startFileMonitoring(selectedProfileId, treeData);
+        } else {
+            console.log(`[App Monitor Effect] Conditions NOT met, calling stopFileMonitoring.`);
+            stopFileMonitoring();
+        }
+    }, [selectedProfileId, treeData, startFileMonitoring, stopFileMonitoring]);
+    
+    // Listen for file freshness updates from backend
+    useEffect(() => {
+        let unlistenFreshness: UnlistenFn | undefined;
+        const setupFreshnessListener = async () => {
+            try {
+                unlistenFreshness = await listen<string[]>("file-freshness-update", (event) => {
+                    console.log("[App Monitor] Received file-freshness-update:", event.payload);
+                    setOutOfDateFilePaths(new Set(event.payload));
+                });
+            } catch (err) {
+                console.error("[App Monitor] Failed to set up file freshness listener:", err);
+            }
+        };
+        setupFreshnessListener();
+        return () => {
+            unlistenFreshness?.();
+        };
+    }, []);
+    // --- End File Monitoring ---
+
 
     const loadProfiles = useCallback(async (selectId?: number) => {
         setIsLoading(true);
         setError(null);
-        console.log(`[APP loadProfiles] Called. selectId param: ${selectId}`);
+        // console.log(`[APP loadProfiles] Called. selectId param: ${selectId}`);
         try {
             if (typeof invoke !== 'function') {
                 throw new Error("Tauri API 'invoke' not ready.");
             }
             const loadedProfiles = await invoke<Profile[]>("list_code_context_builder_profiles");
             setProfiles(loadedProfiles);
-            console.log(`[APP loadProfiles] ${loadedProfiles.length} profiles loaded from backend.`);
-            if (loadedProfiles.length > 0) {
-                 console.log(`[APP loadProfiles] First loaded profile ID: ${loadedProfiles[0].id}, Title: ${loadedProfiles[0].title}`);
-            }
+            // console.log(`[APP loadProfiles] ${loadedProfiles.length} profiles loaded from backend.`);
+            // if (loadedProfiles.length > 0) {
+            //      console.log(`[APP loadProfiles] First loaded profile ID: ${loadedProfiles[0].id}, Title: ${loadedProfiles[0].title}`);
+            // }
 
             let profileToSelect = 0;
             const lastSelectedIdStr = localStorage.getItem('ccb_lastSelectedProfileId');
             const lastSelectedIdNumFromStorage = lastSelectedIdStr ? parseInt(lastSelectedIdStr, 10) : 0;
 
-            console.log(`[APP loadProfiles] Logic check - lastSelectedIdStr from localStorage: '${lastSelectedIdStr}', parsed as: ${lastSelectedIdNumFromStorage}`);
-            console.log(`[APP loadProfiles] Logic check - selectId param: ${selectId}`);
-            console.log(`[APP loadProfiles] Logic check - loadedProfiles IDs:`, loadedProfiles.map(p => p.id));
+            // console.log(`[APP loadProfiles] Logic check - lastSelectedIdStr from localStorage: '${lastSelectedIdStr}', parsed as: ${lastSelectedIdNumFromStorage}`);
+            // console.log(`[APP loadProfiles] Logic check - selectId param: ${selectId}`);
+            // console.log(`[APP loadProfiles] Logic check - loadedProfiles IDs:`, loadedProfiles.map(p => p.id));
 
 
             if (selectId && loadedProfiles.some(p => p.id === selectId)) {
                 profileToSelect = selectId;
-                console.log(`[APP loadProfiles] Outcome: Selected by selectId param: ${profileToSelect}`);
+                // console.log(`[APP loadProfiles] Outcome: Selected by selectId param: ${profileToSelect}`);
             } else if (lastSelectedIdNumFromStorage > 0 && loadedProfiles.some(p => p.id === lastSelectedIdNumFromStorage)) {
                 profileToSelect = lastSelectedIdNumFromStorage;
-                console.log(`[APP loadProfiles] Outcome: Selected from localStorage: ${profileToSelect}`);
+                // console.log(`[APP loadProfiles] Outcome: Selected from localStorage: ${profileToSelect}`);
             } else if (loadedProfiles.length > 0) {
                 profileToSelect = loadedProfiles[0].id;
-                console.log(`[APP loadProfiles] Outcome: Selected by fallback to first profile: ${profileToSelect}`);
+                // console.log(`[APP loadProfiles] Outcome: Selected by fallback to first profile: ${profileToSelect}`);
             } else {
-                console.log(`[APP loadProfiles] Outcome: No profiles loaded or found, selecting 0.`);
-                // profileToSelect remains 0
+                // console.log(`[APP loadProfiles] Outcome: No profiles loaded or found, selecting 0.`);
             }
             
-            console.log(`[APP loadProfiles] About to call setSelectedProfileId with: ${profileToSelect}`);
+            // console.log(`[APP loadProfiles] About to call setSelectedProfileId with: ${profileToSelect}`);
             setSelectedProfileId(profileToSelect);
 
         } catch (err) {
@@ -141,24 +249,27 @@ function App() {
             setError(`Failed to load profiles: ${err instanceof Error ? err.message : String(err)}`);
             setProfiles([]);
             setSelectedProfileId(0);
-            localStorage.removeItem('ccb_lastSelectedProfileId'); // Clean up on error
+            localStorage.removeItem('ccb_lastSelectedProfileId'); 
         } finally {
             setIsLoading(false);
         }
-    }, []); // Empty dependency array: loadProfiles itself doesn't depend on App state to re-memoize.
+    }, []); 
 
     useEffect(() => {
         console.log("[APP MountEffect] Component mounted, calling loadProfiles.");
         loadProfiles();
-    }, [loadProfiles]); // loadProfiles is stable due to its own useCallback([])
+    }, [loadProfiles]); 
 
     useEffect(() => {
         const profile = profiles.find(p => p.id === selectedProfileId);
-        console.log(`[APP MainEffect] Running. selectedProfileId: ${selectedProfileId}, prevProfileId.current: ${prevProfileId.current}, Profile found in 'profiles': ${!!profile}, profiles.length: ${profiles.length}`);
+        console.log(`[APP MainEffect] Running. selectedProfileId: ${selectedProfileId}, prevProfileId.current: ${prevProfileId.current}, Profile found: ${!!profile}`);
 
         if (prevProfileId.current !== selectedProfileId) { 
-            console.log(`[APP MainEffect] Profile ID changed from ${prevProfileId.current} to ${selectedProfileId}. Processing change.`);
+            console.log(`[APP MainEffect] Profile ID changed from ${prevProfileId.current} to ${selectedProfileId}.`);
             
+            // stopFileMonitoring is now called by the monitoring useEffect when selectedProfileId changes.
+            // No need to call it explicitly here.
+
             setEditableTitle(profile?.title || "");
             setEditableRootFolder(profile?.root_folder || "");
             setEditableIgnorePatterns(profile?.ignore_patterns?.join("\n") || "");
@@ -168,7 +279,7 @@ function App() {
                 localStorage.setItem('ccb_lastSelectedProfileId', selectedProfileId.toString());
                 
                 const storedTreeJson = localStorage.getItem(`ccb_treeData_${selectedProfileId}`);
-                console.log(`[APP MainEffect] Loading tree for profile ${selectedProfileId}. Stored JSON: ${storedTreeJson ? 'Found' : 'Not found'}`);
+                // console.log(`[APP MainEffect] Loading tree for profile ${selectedProfileId}. Stored JSON: ${storedTreeJson ? 'Found' : 'Not found'}`);
                 let loadedTree: FileNode | null = null;
                 if (storedTreeJson) {
                     try {
@@ -181,61 +292,42 @@ function App() {
                 setTreeData(loadedTree);
 
                 const storedSelected = localStorage.getItem(`ccb_selectedPaths_${selectedProfileId}`);
-                console.log(`[APP MainEffect] Loading selectedPaths for profile ${selectedProfileId}. Stored: ${storedSelected ? 'Found' : 'Not found'}`);
                 setSelectedPaths(storedSelected ? new Set(JSON.parse(storedSelected)) : new Set());
 
                 const storedExpanded = localStorage.getItem(`ccb_expandedPaths_${selectedProfileId}`);
-                console.log(`[APP MainEffect] Loading expandedPaths for profile ${selectedProfileId}. Stored: ${storedExpanded ? 'Found' : 'Not found'}`);
                 setExpandedPaths(storedExpanded ? new Set(JSON.parse(storedExpanded)) : new Set());
             } else {
-                 // Only remove if we are transitioning *from* a valid profile (prev > 0) *to* no profile (current is 0).
-                 // And also ensure prevProfileId.current was not null (i.e. not the very first run setting initial 0 which should not remove)
                 if (prevProfileId.current !== null && prevProfileId.current > 0) {
-                    console.log(`[APP MainEffect] selectedProfileId is 0 and prev was ${prevProfileId.current}. Removing ccb_lastSelectedProfileId.`);
                     localStorage.removeItem('ccb_lastSelectedProfileId');
-                } else {
-                    console.log(`[APP MainEffect] selectedProfileId is 0, but prev was ${prevProfileId.current}. Not removing ccb_lastSelectedProfileId (initial load or no actual change from valid profile).`);
                 }
-                 setTreeData(null);
+                 setTreeData(null); 
                  setSelectedPaths(new Set());
                  setExpandedPaths(new Set());
             }
             setSearchTerm("");
             setViewingFilePath(null);
         } else {
-            console.log(`[APP MainEffect] Profile ID did NOT change (${selectedProfileId}). Checking for profile data sync.`);
-            if (profile) {
-                if (profile.title !== editableTitle) {
-                    console.log(`[APP MainEffect] Syncing title for profile ${selectedProfileId}.`);
-                    setEditableTitle(profile.title || "");
-                }
-                if ((profile.root_folder || "") !== editableRootFolder) {
-                    console.log(`[APP MainEffect] Syncing root_folder for profile ${selectedProfileId}.`);
-                    setEditableRootFolder(profile.root_folder || "");
-                }
+            // console.log(`[APP MainEffect] Profile ID did NOT change (${selectedProfileId}). Checking for profile data sync.`);
+            if (profile) { // Sync form fields if profile data changes externally (e.g. after save)
+                if (profile.title !== editableTitle) setEditableTitle(profile.title || "");
+                if ((profile.root_folder || "") !== editableRootFolder) setEditableRootFolder(profile.root_folder || "");
                 const profileIgnoreText = profile.ignore_patterns?.join("\n") || "";
-                if (profileIgnoreText !== editableIgnorePatterns) {
-                    console.log(`[APP MainEffect] Syncing ignore_patterns for profile ${selectedProfileId}.`);
-                    setEditableIgnorePatterns(profileIgnoreText);
-                }
+                if (profileIgnoreText !== editableIgnorePatterns) setEditableIgnorePatterns(profileIgnoreText);
             }
         }
         
-        console.log(`[APP MainEffect] Updating prevProfileId.current to: ${selectedProfileId}`);
         prevProfileId.current = selectedProfileId;
 
-    }, [selectedProfileId, profiles]); // Keep dependencies: only react when selectedProfileId or profiles array changes.
+    }, [selectedProfileId, profiles]); // Removed stopFileMonitoring from here as it's handled by the dedicated monitoring effect
 
     useEffect(() => {
         if (selectedProfileId > 0) {
-            // console.log(`[APP PersistEffect] Persisting selectedPaths for profile ${selectedProfileId}:`, Array.from(selectedPaths));
             localStorage.setItem(`ccb_selectedPaths_${selectedProfileId}`, JSON.stringify(Array.from(selectedPaths)));
         }
     }, [selectedPaths, selectedProfileId]);
 
     useEffect(() => {
         if (selectedProfileId > 0) {
-            // console.log(`[APP PersistEffect] Persisting expandedPaths for profile ${selectedProfileId}:`, Array.from(expandedPaths));
             localStorage.setItem(`ccb_expandedPaths_${selectedProfileId}`, JSON.stringify(Array.from(expandedPaths)));
         }
     }, [expandedPaths, selectedProfileId]);
@@ -266,6 +358,11 @@ function App() {
                     if (status !== 'done' && status !== 'cancelled') {
                         setError(`Scan ${status}`);
                     }
+                    if (status === 'done') {
+                        setOutOfDateFilePaths(new Set()); 
+                    }
+                     // After scan completes (done, cancelled, or failed), treeData might have changed or become null.
+                    // The main monitoring useEffect [selectedProfileId, treeData, ...] will handle restarting/stopping the monitor appropriately.
                 });
             } catch (err) { console.error("[APP] Failed to set up scan listeners:", err); setError(`Listener setup failed: ${err instanceof Error ? err.message : String(err)}`); }
         };
@@ -274,7 +371,7 @@ function App() {
             unlistenProgress?.();
             unlistenComplete?.();
         };
-    }, []);
+    }, []); // No dependencies needed here, listeners are setup once
 
     useEffect(() => {
        const storedState = localStorage.getItem('ccb_scanState');
@@ -318,12 +415,22 @@ function App() {
             ignore_patterns: currentIgnoreArr,
         };
         try {
-            console.log(`[APP SaveProfile] Saving profile ID ${selectedProfileId} with title: ${currentTitle}`);
+            // console.log(`[APP SaveProfile] Saving profile ID ${selectedProfileId} with title: ${currentTitle}`);
             await invoke("save_code_context_builder_profile", { profile: profileToSave });
-            setProfiles(prevProfiles => {
+            setProfiles(prevProfiles => { // This will trigger MainEffect to sync form fields if needed
                 const newUpdatedAt = new Date().toISOString();
                 return prevProfiles.map(p => {
                     if (p.id === selectedProfileId) {
+                        // If root_folder changed, the current treeData is likely invalid for monitoring.
+                        // A rescan is implicitly needed by the user.
+                        // The monitoring useEffect will re-evaluate based on current treeData.
+                        // If treeData becomes null or is for a different root, monitoring will adjust.
+                        if(p.root_folder !== currentRootFolder) {
+                            console.log("[App SaveProfile] Root folder changed. Current tree data may be invalid for monitoring.");
+                            // User should rescan. Current treeData is still present until rescan or profile change.
+                            // The monitoring will continue with potentially incorrect file list if not rescanned.
+                            // For simplicity, we don't clear treeData here, relying on user to rescan.
+                        }
                         return {
                             ...p,
                             title: currentTitle,
@@ -355,8 +462,8 @@ function App() {
             };
             try {
                 const newId = await invoke<number>("save_code_context_builder_profile", { profile: newProfileData });
-                console.log(`[APP CreateProfile] New profile created with ID: ${newId}. Reloading profiles to select it.`);
-                await loadProfiles(newId); // Reload and select the new profile
+                // console.log(`[APP CreateProfile] New profile created with ID: ${newId}. Reloading profiles to select it.`);
+                await loadProfiles(newId); 
             }
             catch (err) { setError(`Create failed: ${err instanceof Error ? err.message : String(err)}`); }
         }
@@ -371,7 +478,7 @@ function App() {
             localStorage.removeItem(`ccb_treeData_${selectedProfileId}`);
             localStorage.removeItem(`ccb_selectedPaths_${selectedProfileId}`);
             localStorage.removeItem(`ccb_expandedPaths_${selectedProfileId}`);
-            console.log(`[APP DeleteProfile] Profile ID ${selectedProfileId} deleted. Reloading profiles.`);
+            // stopFileMonitoring will be called by MainEffect when selectedProfileId changes (likely to 0 or another ID)
             await loadProfiles(); 
         }
         catch (err) { setError(`Delete failed: ${err instanceof Error ? err.message : String(err)}`); }
@@ -383,31 +490,39 @@ function App() {
             setError("Cannot scan: No profile selected, scan in progress, or API not ready.");
             return;
         }
-        setIsScanning(true);
-        setScanProgressPct(0);
-        setCurrentScanPath("Initiating scan...");
-        setSelectedPaths(new Set());
-        setError(null);
-        setSearchTerm("");
+        // stopFileMonitoring is now called by the monitoring useEffect if treeData becomes null or changes.
+        // Or by the scan_complete listener indirectly if successful.
+        // For safety, ensure it's stopped before a new scan if it was running for the *current* profile.
+        if(isMonitoringProfile === selectedProfileId) {
+            await stopFileMonitoring();
+       }
 
-        try {
-            const result = await invoke<FileNode>("scan_code_context_builder_profile", { profileId: selectedProfileId });
-            if (result && typeof result === 'object' && typeof result.path === 'string') {
-                setTreeData(result);
+       setIsScanning(true);
+       setScanProgressPct(0);
+       setCurrentScanPath("Initiating scan...");
+       // setSelectedPaths(new Set()); // <-- REMOVED to preserve selections
+       setError(null);
+       setSearchTerm(""); // Clearing search term on scan is reasonable
+       setOutOfDateFilePaths(new Set()); // Stale paths should be cleared by a new scan
+
+       try {
+           const result = await invoke<FileNode>("scan_code_context_builder_profile", { profileId: selectedProfileId });
+           if (result && typeof result === 'object' && typeof result.path === 'string') {
+                setTreeData(result); 
                 localStorage.setItem(`ccb_treeData_${selectedProfileId}`, JSON.stringify(result));
                 setProfiles(prev => prev.map(p => p.id === selectedProfileId ? {...p, updated_at: new Date().toISOString()} : p));
             } else {
-                setTreeData(null);
+                setTreeData(null); 
                 localStorage.removeItem(`ccb_treeData_${selectedProfileId}`);
                 setError("Scan completed but returned invalid data.");
             }
         } catch (err) {
             console.error("[APP] Scan invocation failed:", err);
             setError(`Scan failed: ${err instanceof Error ? err.message : String(err)}`);
-            setTreeData(null);
+            setTreeData(null); 
             localStorage.removeItem(`ccb_treeData_${selectedProfileId}`);
         }
-    }, [selectedProfileId, isScanning]);
+    }, [selectedProfileId, isScanning, stopFileMonitoring, isMonitoringProfile]);
 
     const handleCancelScan = useCallback(async () => {
         if (!isScanning || typeof invoke !== 'function') return;
@@ -494,11 +609,9 @@ function App() {
         } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'X' && !isInputFocused) { 
             event.preventDefault();
             setSelectedPaths(new Set());
-            console.log("[App Hotkey] Ctrl+Shift+X: Cleared selected paths.");
         } else if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 'x' && !isInputFocused) { 
             event.preventDefault();
             setSelectedPaths(new Set());
-            console.log("[App Hotkey] Ctrl+X: Cleared selected paths (Note: This may conflict with standard 'Cut' functionality).");
         }
     }, [treeData, selectedProfileId, isScanning, handleScanProfile]); 
 
@@ -508,16 +621,29 @@ function App() {
             window.removeEventListener('keydown', handleGlobalKeyDown);
         };
     }, [handleGlobalKeyDown]);
-    // --- End Hotkey Handler ---
-
+    
     const treeStats = useMemo(() => calculateTreeStats(treeData), [treeData]);
 
+    // Cleanup monitor on component unmount
+    useEffect(() => {
+        return () => {
+            console.log("[App Monitor] App unmounting, ensuring monitor is stopped.");
+            // Ensure that stopFileMonitoring is called with the *current* state of isMonitoringProfile
+            // This is best handled by calling the raw invoke if `stopFileMonitoring` itself isn't stable
+            // or if its `isMonitoringProfile` dependency might be stale in the cleanup closure.
+            // However, with `isMonitoringProfile` in `stopFileMonitoring`'s dependency array, it should be fine.
+            stopFileMonitoring();
+        };
+    }, [stopFileMonitoring]); // stopFileMonitoring is now stable due to its own useCallback
+
+
+    // JSX remains the same as previously provided
     return (
         <div className="app-container">
             {viewingFilePath && (
                 <FileViewerModal filePath={viewingFilePath} onClose={handleCloseModal} />
             )}
-            {isHotkeysModalOpen && ( // Added Hotkeys Modal Render
+            {isHotkeysModalOpen && ( 
                 <HotkeysModal isOpen={isHotkeysModalOpen} onClose={handleCloseHotkeysModal} />
             )}
             {isScanning && (
@@ -545,8 +671,8 @@ function App() {
                                 profiles={profiles}
                                 selectedProfileId={selectedProfileId}
                                 onProfileSelect={(id) => {
-                                    console.log(`[APP ProfileManager] Profile selected via dropdown/action: ${id}`);
-                                    setSelectedProfileId(id); // This will trigger the main useEffect
+                                    // console.log(`[APP ProfileManager] Profile selected via dropdown/action: ${id}`);
+                                    setSelectedProfileId(id); 
                                 }}
                                 profileTitle={editableTitle}
                                 setProfileTitle={setEditableTitle}
@@ -559,6 +685,7 @@ function App() {
                                 onDeleteProfile={handleDeleteCurrentProfile}
                                 onScanProfile={handleScanProfile}
                                 isScanning={isScanning}
+                                outOfDateFileCount={outOfDateFilePaths.size} 
                             />
                         )}
                     </div>
@@ -594,6 +721,7 @@ function App() {
                         onViewFile={handleViewFile}
                         expandedPaths={expandedPaths}
                         onToggleExpand={handleToggleExpand}
+                        outOfDateFilePaths={outOfDateFilePaths} 
                     />
                     {!treeData && selectedProfileId > 0 && !isScanning && !isLoading && (
                         <div style={{ padding: '1em', color: '#aaa', fontStyle: 'italic', textAlign: 'center', marginTop: '2em' }}>
@@ -614,6 +742,7 @@ function App() {
             <StatusBar
                 stats={treeStats}
                 lastScanTime={selectedProfile?.updated_at}
+                outOfDateFileCount={outOfDateFilePaths.size} 
             />
         </div>
     );

@@ -1,3 +1,4 @@
+
 // src/components/CodeContextBuilder/ProfileManager/ProfileManager.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Profile } from '../../../types/profiles';
@@ -13,11 +14,12 @@ interface ProfileManagerProps {
   setRootFolder: (value: string) => void;
   ignoreText: string;
   setIgnoreText: (value: string) => void;
-  onSaveProfile: () => Promise<'saved' | 'error' | 'no_profile'>; // Updated signature
+  onSaveProfile: () => Promise<'saved' | 'error' | 'no_profile'>; 
   onCreateProfile: () => void;
   onDeleteProfile: () => void;
   onScanProfile: () => void;
   isScanning: boolean;
+  outOfDateFileCount: number; // New prop for stale file indication
 }
 
 function safeSetItem(key: string, value: any) {
@@ -44,6 +46,7 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
   onDeleteProfile,
   onScanProfile,
   isScanning,
+  outOfDateFileCount, // Destructure new prop
 }) => {
   const [showSettings, setShowSettings] = useState<boolean>(() => safeGetItem('ccb_showProfileSettings', true));
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -70,18 +73,15 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
         setTimeout(() => setSaveStatus('idle'), 1500);
       } else {
         setSaveStatus('error');
-        // Persist error state a bit longer or until next change
         setTimeout(() => setSaveStatus('idle'), 3000);
       }
-    }, 750); // 750ms debounce
+    }, 750); 
   }, [onSaveProfile, profileSelected]);
 
-  // Auto-save on relevant field changes
   useEffect(() => {
-    if (profileSelected && !isScanning) { // Only trigger if a profile is selected and not scanning
+    if (profileSelected && !isScanning) { 
       triggerAutoSave();
     }
-    // Cleanup timeout on unmount or when dependencies change before next trigger
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -98,6 +98,21 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
         default: return '';
     }
   };
+
+  const scanButtonTitle = !profileSelected
+    ? "Select a profile first"
+    : isScanning
+    ? "Scan in progress..."
+    : outOfDateFileCount > 0
+    ? `Rescan recommended (${outOfDateFileCount} file${outOfDateFileCount === 1 ? '' : 's'} changed)`
+    : "Scan files for selected profile";
+
+  const scanButtonIcon = isScanning 
+    ? '⏳' 
+    : outOfDateFileCount > 0 
+    ? '🔄' // Refresh icon for stale
+    : '🔍';
+
 
   return (
     <div className="profile-manager">
@@ -127,20 +142,17 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
         <button
            onClick={onScanProfile}
            disabled={!profileSelected || isScanning}
-           title={
-               !profileSelected ? "Select a profile first" :
-               isScanning ? "Scan in progress..." :
-               "Scan files for selected profile"
-            }
+           title={scanButtonTitle}
+           className={outOfDateFileCount > 0 && !isScanning ? 'scan-btn-stale' : ''}
         >
-           {isScanning ? '⏳' : '🔍'} {/* Using hourglass for scanning */}
+           {scanButtonIcon}
         </button>
         <button 
             onClick={() => setShowSettings(!showSettings)} 
             disabled={isScanning || !profileSelected} 
             title={showSettings ? "Hide Profile Settings" : "Show Profile Settings"}
         >
-          {showSettings ? '⚙️' : '⚙️'} {/* Consider different icons if desired, e.g. eye */}
+          {showSettings ? '⚙️' : '⚙️'} 
         </button>
       </div>
 
@@ -152,7 +164,6 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
           setRootFolder={setRootFolder}
           ignoreText={ignoreText}
           setIgnoreText={setIgnoreText}
-          // onSaveProfile is now handled by auto-save, no explicit button
         />
       )}
        {showSettings && !profileSelected && (

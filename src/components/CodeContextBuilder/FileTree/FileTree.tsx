@@ -1,4 +1,5 @@
 
+
 // src/components/CodeContextBuilder/FileTree/FileTree.tsx
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -15,6 +16,7 @@ interface FileTreeProps {
     onViewFile: (path: string) => void;
     expandedPaths: Set<string>;
     onToggleExpand: (path: string) => void;
+    outOfDateFilePaths: Set<string>; // New prop
 }
 
 const FileTree: React.FC<FileTreeProps> = ({
@@ -26,6 +28,7 @@ const FileTree: React.FC<FileTreeProps> = ({
     onViewFile,
     expandedPaths,
     onToggleExpand,
+    outOfDateFilePaths, // Destructure new prop
 }) => {
     const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -94,19 +97,12 @@ const FileTree: React.FC<FileTreeProps> = ({
 
     const collapseAllDirs = useCallback(() => {
         const newExpanded = new Set<string>();
-        // Optionally keep root expanded:
-        // if (treeData && treeData.is_dir) newExpanded.add(treeData.path);
-        
-        // To collapse ALL including root, if root is in expandedPaths:
         expandedPaths.forEach(p => {
-             if (newExpanded.has(p)) { // This condition should not be met if newExpanded is empty
-                // but if we decide to keep root expanded, it might
+             if (newExpanded.has(p)) { 
              } else {
-                onToggleExpand(p); // Toggle each one to remove it
+                onToggleExpand(p); 
              }
         });
-        // If expandedPaths is managed by setting the whole set:
-        // onSetExpandedPaths(newExpanded); // Assuming a setter for the whole set if needed
     }, [expandedPaths, onToggleExpand]);
 
 
@@ -115,19 +111,15 @@ const FileTree: React.FC<FileTreeProps> = ({
         if (!treeData) return;
         if (event.ctrlKey || event.metaKey) {
             expandAllDirs();
-        } else { // Single-level expand
-            if (!treeData.is_dir) return; // Cannot expand if root is not a directory
+        } else { 
+            if (!treeData.is_dir) return; 
 
             const newPathsToExpand = new Set<string>();
             
             if (expandedPaths.size === 0) {
-                // If fully collapsed, the first "expand" action is to open the root node itself.
-                // This allows its children to be rendered by its FileTreeNode component.
                 newPathsToExpand.add(treeData.path);
             } else { 
-                // Partially or fully expanded: expand children of the deepest currently expanded nodes.
                 let currentMaxDepth = -1;
-                // Determine the maximum depth among currently expanded directory nodes
                 expandedPaths.forEach(path => {
                     const node = findNodeByPath(treeData, path);
                     if (node && node.is_dir) {
@@ -138,25 +130,15 @@ const FileTree: React.FC<FileTreeProps> = ({
                     }
                 });
 
-                // If currentMaxDepth remained -1, it implies expandedPaths might contain non-directories
-                // or paths not in the current tree. Or, no directories are expanded.
-                // If only non-directories are "expanded", or if no directories are expanded but root itself is,
-                // treat as if we're expanding from root.
                 if (currentMaxDepth === -1) {
-                    // This case handles if only the root is in expandedPaths (depth 0), 
-                    // or if expandedPaths has items not yielding a valid depth.
-                    // We'll try to expand children of root if root is a directory.
-                    if (expandedPaths.has(treeData.path) || expandedPaths.size === 0) { // Second part of OR is defensive
+                    if (expandedPaths.has(treeData.path) || expandedPaths.size === 0) { 
                         treeData.children?.forEach(child => {
                             if (child.is_dir) {
                                 newPathsToExpand.add(child.path);
                             }
                         });
                     }
-                    // If root is not expanded and nothing else gives a depth, this branch might need
-                    // to add treeData.path itself, but the outer `if (expandedPaths.size === 0)` handles that.
                 } else {
-                    // Expand children of nodes at currentMaxDepth
                     expandedPaths.forEach(path => {
                         const node = findNodeByPath(treeData, path);
                         if (node && node.is_dir) {
@@ -174,7 +156,7 @@ const FileTree: React.FC<FileTreeProps> = ({
             }
 
             newPathsToExpand.forEach(p => {
-                if (!expandedPaths.has(p)) { // Only toggle to expand if not already expanded
+                if (!expandedPaths.has(p)) { 
                     onToggleExpand(p);
                 }
             });
@@ -185,7 +167,7 @@ const FileTree: React.FC<FileTreeProps> = ({
         if (!treeData) return;
         if (event.ctrlKey || event.metaKey) {
             collapseAllDirs();
-        } else { // Single-level collapse
+        } else { 
             if (expandedPaths.size === 0) return;
 
             let maxDepth = -1;
@@ -196,7 +178,7 @@ const FileTree: React.FC<FileTreeProps> = ({
                 }
             });
 
-            if (maxDepth === -1) return; // Should not happen if expandedPaths is not empty
+            if (maxDepth === -1) return; 
 
             const pathsToCollapseAtMaxDepth = new Set<string>();
             expandedPaths.forEach(path => {
@@ -267,6 +249,7 @@ const FileTree: React.FC<FileTreeProps> = ({
                             expandedPaths={effectiveExpandedPaths}
                             onToggleExpand={onToggleExpand}
                             highlightedPath={highlightedPath}
+                            outOfDateFilePaths={outOfDateFilePaths} // Pass down
                         />
                    ) : (
                        searchTerm && <li style={{ padding: '1em', color: '#888', fontStyle: 'italic' }}>No matching files found.</li>
