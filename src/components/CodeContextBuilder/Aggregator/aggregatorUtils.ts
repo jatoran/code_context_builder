@@ -54,7 +54,8 @@ export function formatFileContent(
 ): string {
     if (format === 'markdown') {
         const header = '#'.repeat(depth);
-        return `${header} ${escapeXml(fileName)}\n\`\`\`${lang}\n${content}\n\`\`\`\n---\n\n`;
+        // Use filePath for the markdown header instead of just fileName
+        return `${header} ${escapeXml(filePath)}\n\`\`\`${lang}\n${content}\n\`\`\`\n---\n\n`;
     } else if (format === 'xml') {
         const indent = '  '.repeat(depth -1); // Assuming depth 1 is root, file content is not indented further than its tag
         return `${indent}<file name="${escapeXml(fileName)}" path="${escapeXml(filePath)}">\n${indent}  <![CDATA[\n${content}\n${indent}  ]]>\n${indent}</file>\n\n`;
@@ -70,7 +71,9 @@ export function formatFolderHeader(
 ): string {
     if (format === 'markdown') {
         const header = '#'.repeat(depth);
-        return `${header} ${escapeXml(folderName)}/\n`;
+        // Use folderPath for the markdown header and ensure it ends with a slash
+        const displayPath = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
+        return `${header} ${escapeXml(displayPath)}\n`;
     } else if (format === 'xml') {
         const indent = '  '.repeat(depth -1);
         return `${indent}<folder name="${escapeXml(folderName)}" path="${escapeXml(folderPath)}">\n`;
@@ -101,40 +104,6 @@ function isNodeOrDescendantFileSelected(node: FileNode, selectedPaths: Set<strin
     return false;
 }
 
-// function buildMarkdownTreeRecursive(
-//     node: FileNode,
-//     selectedPaths: Set<string>,
-//     lines: string[],
-//     prefix: string
-// ): void {
-//     if (!isNodeOrDescendantFileSelected(node, selectedPaths)) {
-//         return;
-//     }
-
-//     lines.push(`${prefix}${node.is_dir ? '📁' : '📄'} ${escapeXml(node.name)}${node.is_dir ? '/' : ''}`);
-
-//     if (node.is_dir && node.children) {
-//         const relevantChildren = node.children.filter(child => isNodeOrDescendantFileSelected(child, selectedPaths));
-//         relevantChildren.sort((a,b) => { // Files first, then dirs, then alpha
-//             if (!a.is_dir && b.is_dir) return -1;
-//             if (a.is_dir && !b.is_dir) return 1;
-//             return a.name.localeCompare(b.name);
-//         });
-
-//         // relevantChildren.forEach((child, index) => {
-//             // const isLast = index === relevantChildren.length - 1;
-//             // const newPrefix = prefix + (isLast ? '    └── ' : '    ├── ');
-//             // This prefix logic is for a more traditional tree. The plan's example is simpler.
-//             // Let's adjust to the plan's example:
-//             // └── root/
-//             //     ├── file.txt
-//             //     └── sub/
-//             // For this, we need to pass depth for simple indentation.
-//         // });
-//     }
-// }
-
-
 function buildFormattedTreeRecursiveInternal(
     node: FileNode,
     selectedPaths: Set<string>,
@@ -157,6 +126,7 @@ function buildFormattedTreeRecursiveInternal(
         if (depth > 0) {
             prefix += isLastChildStack[depth - 1] ? '└── ' : '├── ';
         }
+        // For selected tree, continue using node.name for brevity
         output += `${prefix}${node.is_dir ? '📁' : '📄'} ${escapeXml(node.name)}${node.is_dir ? '/' : ''}\n`;
     } else if (format === 'xml') {
         const indent = '  '.repeat(depth);
@@ -203,39 +173,44 @@ function buildFullFormattedTreeRecursiveInternal(
     // Determine prefix for Markdown based on depth and whether parent was last child
     if (format === 'markdown') {
         let prefix = '';
-        for (let i = 0; i < depth -1; i++) {
+        // For depth 0 (direct children of the initially printed root), no prefix from parent stack.
+        // For depth > 0, calculate prefix based on isLastChildStack.
+        // The loop for `isLastChildStack` should go up to `depth - 1`.
+        // The prefix for the current node (├── or └──) depends on `isLastChildStack[depth -1]`.
+        for (let i = 0; i < depth - 1; i++) { // Corrected loop condition
             prefix += isLastChildStack[i] ? '    ' : '│   ';
         }
-        if (depth > 0) {
+        if (depth > 0) { // Apply for children, not for a conceptual depth 0 root (which isn't passed here)
             prefix += isLastChildStack[depth - 1] ? '└── ' : '├── ';
         }
-        output += `${prefix}${node.is_dir ? '📁' : '📄'} ${escapeXml(node.name)}${node.is_dir ? '/' : ''}\n`;
+        
+        const displayName = node.is_dir && !node.name.endsWith('/') ? `${node.name}/` : node.name;
+        output += `${prefix}${node.is_dir ? '📁' : '📄'} ${escapeXml(displayName)}\n`;
+
     } else if (format === 'xml') {
         const indent = '  '.repeat(depth);
         if (node.is_dir) {
             output += `${indent}<folder name="${escapeXml(node.name)}" path="${escapeXml(node.path)}">\n`;
         } else {
-            // For a full tree, files also get their own tags, similar to selected tree.
             output += `${indent}<file name="${escapeXml(node.name)}" path="${escapeXml(node.path)}" />\n`;
         }
     }
 
-    // Process children if it's a directory
     if (node.is_dir && node.children) {
-        // Sort all children (files first, then dirs, then alphabetically)
         const sortedChildren = [...node.children].sort((a, b) => {
-            if (!a.is_dir && b.is_dir) return -1; // Files before directories
-            if (a.is_dir && !b.is_dir) return 1;  // Directories after files
-            return a.name.localeCompare(b.name); // Alphabetical for same types
+            if (!a.is_dir && b.is_dir) return -1;
+            if (a.is_dir && !b.is_dir) return 1;
+            return a.name.localeCompare(b.name);
         });
 
         sortedChildren.forEach((child, index) => {
-            const newIsLastChildStack = [...isLastChildStack, index === sortedChildren.length - 1];
+            // Pass depth + 1 for children.
+            // The isLastChildStack for the child's level is its own last status plus parents'.
+            const newIsLastChildStack = [...isLastChildStack.slice(0, depth), index === sortedChildren.length - 1];
             output += buildFullFormattedTreeRecursiveInternal(child, format, depth + 1, newIsLastChildStack);
         });
     }
 
-    // Close folder tag for XML
     if (format === 'xml' && node.is_dir) {
         output += `${'  '.repeat(depth)}</folder>\n`;
     }
@@ -244,7 +219,7 @@ function buildFullFormattedTreeRecursiveInternal(
 }
 
 export function generateFullScannedFileTree(
-    rootNode: FileNode | null, // Allow rootNode to be null
+    rootNode: FileNode | null,
     format: OutputFormat
 ): string {
     if (!rootNode) return "";
@@ -252,9 +227,25 @@ export function generateFullScannedFileTree(
     let treeString = "";
     if (format === 'markdown') {
         treeString = `# Full Scanned File Tree\n\n`;
-        treeString += buildFullFormattedTreeRecursiveInternal(rootNode, format, 0, []);
+        const initialDisplayName = rootNode.is_dir && !rootNode.name.endsWith('/') ? `${rootNode.name}/` : rootNode.name;
+        treeString += `${rootNode.is_dir ? '📁' : '📄'} ${escapeXml(initialDisplayName)}\n`;
+
+        if (rootNode.is_dir && rootNode.children) {
+            const sortedChildren = [...rootNode.children].sort((a, b) => {
+                if (!a.is_dir && b.is_dir) return -1;
+                if (a.is_dir && !b.is_dir) return 1;
+                return a.name.localeCompare(b.name);
+            });
+            sortedChildren.forEach((child, index) => {
+                // Children of the root are at depth 1.
+                // Their isLastChildStack starts fresh with just their own last status.
+                const childIsLastChildStack = [index === sortedChildren.length - 1];
+                treeString += buildFullFormattedTreeRecursiveInternal(child, format, 1, childIsLastChildStack);
+            });
+        }
     } else if (format === 'xml') {
-        treeString = `<fileTree type="full">\n`; // Add type attribute for clarity
+        treeString = `<fileTree type="full">\n`;
+        // For XML, the recursive function handles the root wrapper itself if called with depth 0
         treeString += buildFullFormattedTreeRecursiveInternal(rootNode, format, 0, []);
         treeString += `</fileTree>\n`;
     }
@@ -274,7 +265,23 @@ export function generateFormattedFileTree(
     let treeString = "";
     if (format === 'markdown') {
         treeString = `# Selected File Tree\n\n`;
-        treeString += buildFormattedTreeRecursiveInternal(rootNode, selectedPaths, format, 0, []);
+        const rootDisplayName = rootNode.is_dir && !rootNode.name.endsWith('/') ? `${rootNode.name}/` : rootNode.name;
+        treeString += `${rootNode.is_dir ? '📁' : '📄'} ${escapeXml(rootDisplayName)}\n`;
+        
+        if (rootNode.is_dir && rootNode.children) {
+             const relevantChildren = rootNode.children
+                .filter(child => isNodeOrDescendantFileSelected(child, selectedPaths))
+                .sort((a, b) => {
+                    if (!a.is_dir && b.is_dir) return -1;
+                    if (a.is_dir && !b.is_dir) return 1;
+                    return a.name.localeCompare(b.name);
+                });
+            relevantChildren.forEach((child, index) => {
+                 const childIsLastChildStack = [index === relevantChildren.length - 1];
+                 treeString += buildFormattedTreeRecursiveInternal(child, selectedPaths, format, 1, childIsLastChildStack);
+            });
+        }
+
     } else if (format === 'xml') {
         treeString = `<fileTree>\n`;
         treeString += buildFormattedTreeRecursiveInternal(rootNode, selectedPaths, format, 0, []);

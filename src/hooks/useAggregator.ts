@@ -7,8 +7,7 @@ import {
     formatFileContent,
     formatFolderHeader,
     formatFolderFooter,
-    // generateFormattedFileTree, // For selection-based tree (if ever needed again directly)
-    generateFullScannedFileTree, // For full scanned tree
+    generateFullScannedFileTree, 
     getLanguageFromPath,
 } from '../components/CodeContextBuilder/Aggregator/aggregatorUtils';
 
@@ -22,7 +21,7 @@ interface AggregatorSettings {
 interface UseAggregatorProps {
     treeData: FileNode | null;
     selectedPaths: Set<string>;
-    selectedProfileId: number | null; // Added selectedProfileId
+    selectedProfileId: number | null;
 }
 
 interface UseAggregatorReturn {
@@ -38,7 +37,6 @@ interface UseAggregatorReturn {
     copySuccess: boolean;
 }
 
-// Helper to check if a directory node or its descendants contain selected files
 const isDirRelevantForAggregation = (dirNode: FileNode, selectedPaths: Set<string>): boolean => {
     if (!dirNode.is_dir) return false;
     if (dirNode.children?.some(child => !child.is_dir && selectedPaths.has(child.path))) return true;
@@ -46,6 +44,18 @@ const isDirRelevantForAggregation = (dirNode: FileNode, selectedPaths: Set<strin
     return false;
 };
 
+// Helper to get relative path
+function getRelativePath(fullPath: string, rootPath: string): string {
+    if (fullPath.startsWith(rootPath)) {
+        let relative = fullPath.substring(rootPath.length);
+        // Remove leading slash or backslash
+        if (relative.startsWith('/') || relative.startsWith('\\')) {
+            relative = relative.substring(1);
+        }
+        return relative;
+    }
+    return fullPath; // Fallback, though should ideally always be relative
+}
 
 
 export function useAggregator({ treeData, selectedPaths, selectedProfileId }: UseAggregatorProps): UseAggregatorReturn {
@@ -55,29 +65,18 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
     const [error, setError] = useState<string | null>(null);
     const [copySuccess, setCopySuccess] = useState<boolean>(false);
 
-    // Internal state for format and prepend options
     const [currentSelectedFormat, setCurrentSelectedFormat] = useState<OutputFormat>('markdown');
     const [currentPrependFileTree, setCurrentPrependFileTree] = useState<boolean>(false);
 
-    // Effect to load settings from localStorage when selectedProfileId changes
     useEffect(() => {
         if (selectedProfileId && selectedProfileId > 0) {
             try {
                 const storedSettingsRaw = localStorage.getItem(`ccb_agg_settings_${selectedProfileId}`);
                 if (storedSettingsRaw) {
                     const settings: AggregatorSettings = JSON.parse(storedSettingsRaw);
-                    if (settings.format && (settings.format === 'markdown' || settings.format === 'xml')) {
-                        setCurrentSelectedFormat(settings.format);
-                    } else {
-                        setCurrentSelectedFormat('markdown'); // Default if invalid
-                    }
-                    if (typeof settings.prependTree === 'boolean') {
-                        setCurrentPrependFileTree(settings.prependTree);
-                    } else {
-                        setCurrentPrependFileTree(false); // Default if invalid
-                    }
+                    setCurrentSelectedFormat(settings.format && (settings.format === 'markdown' || settings.format === 'xml') ? settings.format : 'markdown');
+                    setCurrentPrependFileTree(typeof settings.prependTree === 'boolean' ? settings.prependTree : false);
                 } else {
-                    // No settings stored for this profile, use defaults
                     setCurrentSelectedFormat('markdown');
                     setCurrentPrependFileTree(false);
                 }
@@ -87,22 +86,18 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
                 setCurrentPrependFileTree(false);
             }
         } else {
-            // No profile selected (or ID is 0), reset to defaults
             setCurrentSelectedFormat('markdown');
             setCurrentPrependFileTree(false);
         }
     }, [selectedProfileId]);
 
-    // Exported setters that update local state and save to localStorage
     const handleSetSelectedFormat = useCallback((format: OutputFormat) => {
         setCurrentSelectedFormat(format);
         if (selectedProfileId && selectedProfileId > 0) {
             const newSettings: AggregatorSettings = { format, prependTree: currentPrependFileTree };
             try {
                 localStorage.setItem(`ccb_agg_settings_${selectedProfileId}`, JSON.stringify(newSettings));
-            } catch (e) {
-                console.error("Failed to save aggregator format to localStorage", e);
-            }
+            } catch (e) { console.error("Failed to save aggregator format to localStorage", e); }
         }
     }, [selectedProfileId, currentPrependFileTree]);
 
@@ -112,49 +107,54 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
             const newSettings: AggregatorSettings = { format: currentSelectedFormat, prependTree: prepend };
             try {
                 localStorage.setItem(`ccb_agg_settings_${selectedProfileId}`, JSON.stringify(newSettings));
-            } catch (e) {
-                console.error("Failed to save aggregator prependTree to localStorage", e);
-            }
+            } catch (e) { console.error("Failed to save aggregator prependTree to localStorage", e); }
         }
     }, [selectedProfileId, currentSelectedFormat]);
-
 
     const buildAggregatedContentRecursive = useCallback(async (
         currentNode: FileNode,
         currentMarkDownDepth: number,
-        formatToUse: OutputFormat // Pass format explicitly
+        formatToUse: OutputFormat,
+        profileRootPath: string // Added profileRootPath
     ): Promise<string> => {
         let builtContent = "";
-
-        // 1. Process files in the current directory node
-        const filesInCurrentNode = currentNode.children?.filter(child => !child.is_dir && selectedPaths.has(child.path)) || [];
-        filesInCurrentNode.sort((a, b) => a.name.localeCompare(b.name));
-
-        for (const fileNode of filesInCurrentNode) {
-            try {
-                const fileContent = await invoke<string>("read_file_contents", { filePath: fileNode.path });
-                const lang = getLanguageFromPath(fileNode.path);
-                builtContent += formatFileContent(fileNode.path, fileNode.name, fileContent, formatToUse, currentMarkDownDepth, lang);
-            } catch (e) {
-                const lang = getLanguageFromPath(fileNode.path);
-                const errorMsg = e instanceof Error ? e.message : String(e);
-                builtContent += formatFileContent(fileNode.path, fileNode.name, `// Error reading file: ${errorMsg}`, formatToUse, currentMarkDownDepth, lang);
+    
+        const relevantChildren = currentNode.children?.filter(child => {
+            if (!child.is_dir) {
+                return selectedPaths.has(child.path);
             }
-        }
+            return isDirRelevantForAggregation(child, selectedPaths);
+        }) || [];
+    
+        relevantChildren.sort((a, b) => {
+            if (!a.is_dir && b.is_dir) return -1;
+            if (a.is_dir && !b.is_dir) return 1;
+            return a.name.localeCompare(b.name);
+        });
+    
+        for (const childNode of relevantChildren) {
+            const displayPath = getRelativePath(childNode.path, profileRootPath);
 
-        // 2. Process child directories
-        const dirsInCurrentNode = currentNode.children?.filter(child => child.is_dir) || [];
-        dirsInCurrentNode.sort((a, b) => a.name.localeCompare(b.name));
-
-        for (const dirNode of dirsInCurrentNode) {
-            if (isDirRelevantForAggregation(dirNode, selectedPaths)) {
-                builtContent += formatFolderHeader(dirNode.name, dirNode.path, formatToUse, currentMarkDownDepth);
-                builtContent += await buildAggregatedContentRecursive(dirNode, currentMarkDownDepth + 1, formatToUse);
+            if (!childNode.is_dir) {
+                try {
+                    const fileContent = await invoke<string>("read_file_contents", { filePath: childNode.path });
+                    const lang = getLanguageFromPath(childNode.path);
+                    // Pass displayPath (relative) to formatFileContent
+                    builtContent += formatFileContent(displayPath, childNode.name, fileContent, formatToUse, currentMarkDownDepth, lang);
+                } catch (e) {
+                    const lang = getLanguageFromPath(childNode.path);
+                    const errorMsg = e instanceof Error ? e.message : String(e);
+                    builtContent += formatFileContent(displayPath, childNode.name, `// Error reading file: ${errorMsg}`, formatToUse, currentMarkDownDepth, lang);
+                }
+            } else {
+                // Pass displayPath (relative) to formatFolderHeader
+                builtContent += formatFolderHeader(childNode.name, displayPath, formatToUse, currentMarkDownDepth);
+                builtContent += await buildAggregatedContentRecursive(childNode, currentMarkDownDepth + 1, formatToUse, profileRootPath);
                 builtContent += formatFolderFooter(formatToUse, currentMarkDownDepth);
             }
         }
         return builtContent;
-    }, [selectedPaths]); // Removed currentSelectedFormat from here, will pass it
+    }, [selectedPaths]);
 
     const generateAggregatedText = useCallback(async () => {
         setIsLoading(true);
@@ -170,42 +170,43 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
             return;
         }
 
-        // Use the current state values for format and prepend
         const formatToUse = currentSelectedFormat;
         const prependToUse = currentPrependFileTree;
+        const profileRootAbsolutePath = treeData.path; // Absolute path of the profile's root
 
-        // Step 1: Generate prepended tree string if requested
         if (prependToUse) {
             textForPrependedTree = generateFullScannedFileTree(treeData, formatToUse);
         }
 
-        // Step 2: Aggregate core content if paths are selected
         if (selectedPaths.size > 0) {
             if (treeData.is_dir) {
-                let rootRelevantForHeader = isDirRelevantForAggregation(treeData, selectedPaths);
-                
-                if (rootRelevantForHeader) {
-                    aggregatedCoreContent += formatFolderHeader(treeData.name, treeData.path, formatToUse, 1);
-                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, 2, formatToUse);
-                    aggregatedCoreContent += formatFolderFooter(formatToUse, 1);
+                let rootLevelDepth = 1;
+                // For the root display path, use its name (e.g., "my_project/")
+                // The full path from OS root is profileRootAbsolutePath
+                const rootDisplayPath = treeData.name.endsWith('/') ? treeData.name : `${treeData.name}/`;
+
+                if (isDirRelevantForAggregation(treeData, selectedPaths)) {
+                    aggregatedCoreContent += formatFolderHeader(treeData.name, rootDisplayPath, formatToUse, rootLevelDepth);
+                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth + 1, formatToUse, profileRootAbsolutePath);
+                    aggregatedCoreContent += formatFolderFooter(formatToUse, rootLevelDepth);
                 } else {
-                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, 1, formatToUse);
+                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth, formatToUse, profileRootAbsolutePath);
                 }
 
             } else if (selectedPaths.has(treeData.path)) { // Root is a single selected file
                 try {
                     const fileContent = await invoke<string>("read_file_contents", { filePath: treeData.path });
                     const lang = getLanguageFromPath(treeData.path);
-                    aggregatedCoreContent += formatFileContent(treeData.path, treeData.name, fileContent, formatToUse, 1, lang);
+                    // For a single root file, its display path is its name
+                    aggregatedCoreContent += formatFileContent(treeData.name, treeData.name, fileContent, formatToUse, 1, lang);
                 } catch (e) {
                     const lang = getLanguageFromPath(treeData.path);
                     const errorMsg = e instanceof Error ? e.message : String(e);
-                    aggregatedCoreContent += formatFileContent(treeData.path, treeData.name, `// Error reading file: ${errorMsg}`, formatToUse, 1, lang);
+                    aggregatedCoreContent += formatFileContent(treeData.name, treeData.name, `// Error reading file: ${errorMsg}`, formatToUse, 1, lang);
                 }
             }
         }
         
-        // Step 3: Combine tree and content
         let finalOutput = '';
         if (textForPrependedTree.length > 0) {
             finalOutput += textForPrependedTree;
@@ -244,20 +245,19 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
 
     useEffect(() => {
         generateAggregatedText();
-    }, [generateAggregatedText]); // This will run when currentSelectedFormat or currentPrependFileTree changes (among others)
+    }, [generateAggregatedText]);
 
     const handleCopyToClipboard = useCallback(async () => {
         if (!aggregatedText || isLoading) return;
         try {
             await navigator.clipboard.writeText(aggregatedText);
             setCopySuccess(true);
-            window.dispatchEvent(new CustomEvent('global-copy-success')); // Dispatch global event
+            window.dispatchEvent(new CustomEvent('global-copy-success'));
             setTimeout(() => setCopySuccess(false), 1500);
         } catch (err) {
             console.error("Failed to copy to clipboard:", err);
             const errorMsg = err instanceof Error ? err.message : String(err);
             setError(`Failed to copy: ${errorMsg}`);
-            // Consider dispatching a 'global-copy-error' event here if needed
             alert("Failed to copy text. See console for details.");
         }
     }, [aggregatedText, isLoading]);
@@ -267,10 +267,10 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
         tokenCount,
         isLoading,
         error,
-        selectedFormat: currentSelectedFormat, // Return current state
-        setSelectedFormat: handleSetSelectedFormat, // Return new handler
-        prependFileTree: currentPrependFileTree, // Return current state
-        setPrependFileTree: handleSetPrependFileTree, // Return new handler
+        selectedFormat: currentSelectedFormat,
+        setSelectedFormat: handleSetSelectedFormat,
+        prependFileTree: currentPrependFileTree,
+        setPrependFileTree: handleSetPrependFileTree,
         handleCopyToClipboard,
         copySuccess,
     };

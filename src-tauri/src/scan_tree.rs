@@ -1,3 +1,4 @@
+
 // src-tauri/src/scan_tree.rs
 // Contains logic for traversing filesystem, applying ignore/allow rules, and building the tree structure.
 
@@ -12,15 +13,17 @@ use crate::scan_state::is_scan_cancelled;
 use crate::types::FileNode;
 
 // --- Keep finalize_node (with its logging) ---
-/// Recursively sorts children (folders first, then alphabetically) and aggregates stats for directories.
+/// Recursively sorts children (files first, then folders, then alphabetically) and aggregates stats for directories.
 fn finalize_node(node: &mut FileNode) {
     // println!("[FINALIZE_NODE] Processing node: '{}', IsDir: {}, Children Before Sort: {}", node.name, node.is_dir, node.children.len());
 
     if node.is_dir {
-        node.children.sort_by(|a, b| match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        node.children.sort_by(|a, b| {
+            match (a.is_dir, b.is_dir) {
+                (false, true) => std::cmp::Ordering::Less, // Files before directories
+                (true, false) => std::cmp::Ordering::Greater, // Directories after files
+                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()), // Alphabetical for same types
+            }
         });
 
         // println!("[FINALIZE_NODE] Node '{}': Children After Sort: {}", node.name, node.children.len());
