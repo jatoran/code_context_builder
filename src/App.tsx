@@ -569,6 +569,7 @@ function App() {
     const handleClearSearch = () => { setSearchTerm(""); fileTreeRef.current?.clearSearchState(); searchInputRef.current?.focus(); };
 
     const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
+    const searchInputTitle = "Search files. Ctrl+F to focus. In search: ↓/↑ to navigate results, Enter to toggle selection, Esc to clear & unfocus.";
 
     return (
         <div className="app-container">
@@ -628,7 +629,15 @@ function App() {
                         </button>
                         <h3>File Explorer {isScanning && <span className="header-scanning-indicator">(Scanning...)</span>}</h3>
                         <div className="file-tree-search-controls">
-                            <input ref={searchInputRef} type="text" placeholder="Search (Ctrl+F)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={handleSearchInputKeyDown} />
+                            <input 
+                                ref={searchInputRef} 
+                                type="text" 
+                                placeholder="Search (Ctrl+F)..." 
+                                value={searchTerm} 
+                                onChange={(e) => setSearchTerm(e.target.value)} 
+                                onKeyDown={handleSearchInputKeyDown}
+                                title={searchInputTitle}
+                            />
                             <button onClick={(e) => fileTreeRef.current?.expandTreeLevel(e.ctrlKey || e.metaKey)} title="Expand Level (Ctrl+Click for All)">▼</button>
                             <button onClick={(e) => fileTreeRef.current?.collapseTreeLevel(e.ctrlKey || e.metaKey)} title="Collapse Level (Ctrl+Click for All)">▲</button>
                             {searchTerm && (<button onClick={handleClearSearch} title="Clear Search (Esc)">✕</button>)}

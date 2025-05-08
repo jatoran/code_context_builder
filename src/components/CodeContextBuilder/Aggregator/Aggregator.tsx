@@ -91,6 +91,7 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, select
                 <button
                     onClick={handleCopyToClipboard}
                     disabled={!aggregatedText || isLoading}
+                    title="Ctrl+Shift+C"
                     style={{
                         backgroundColor: copySuccess ? "var(--accent-color)" : undefined,
                         color: copySuccess ? "#fff" : undefined, 

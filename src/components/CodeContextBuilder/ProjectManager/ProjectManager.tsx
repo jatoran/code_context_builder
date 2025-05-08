@@ -154,13 +154,16 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     }
   };
 
-  const scanButtonTitle = !projectSelected
-    ? "Select a project first"
-    : isScanning
-    ? "Scan in progress..."
-    : outOfDateFileCount > 0
-    ? `Rescan recommended (${outOfDateFileCount} file${outOfDateFileCount === 1 ? '' : 's'} changed)`
-    : "Scan files for selected project";
+  const scanButtonTitle = (() => {
+    if (!projectSelected) return "Select a project first";
+    if (isScanning) return "Scan in progress...";
+    
+    let baseTitle = "Scan files for selected project (Ctrl+Shift+R)";
+    if (outOfDateFileCount > 0) {
+      baseTitle = `Rescan recommended (${outOfDateFileCount} file${outOfDateFileCount === 1 ? '' : 's'} changed) (Ctrl+Shift+R)`;
+    }
+    return baseTitle;
+  })();
 
   const scanButtonIcon = isScanning
     ? '⏳'
