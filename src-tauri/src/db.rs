@@ -1,3 +1,4 @@
+
 // src-tauri/src/db.rs
 use rusqlite::Connection;
 use std::fs;
@@ -50,7 +51,6 @@ pub fn init_connection(app_handle: &AppHandle) -> Result<Connection, String> {
 }
 
 // Creates the necessary tables if they don't exist
-// This function remains unchanged as it only deals with table schema.
 pub fn init_db_tables(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         r#"
@@ -69,6 +69,10 @@ pub fn init_db_tables(conn: &Connection) -> Result<(), String> {
             size INTEGER NOT NULL,
             lines INTEGER NOT NULL,
             tokens INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
         );
         "#,
     )

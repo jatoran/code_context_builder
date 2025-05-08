@@ -1,5 +1,4 @@
 
-
 // src-tauri/src/main.rs
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -12,7 +11,8 @@ mod scan_cache;
 mod scan_state;
 mod scan_tree;
 mod utils;
-mod file_monitor; // Added file_monitor module
+mod file_monitor;
+mod app_settings; // Added app_settings module
 
 // Import necessary items
 use db::{AppState, init_connection, init_db_tables};
@@ -62,10 +62,12 @@ fn main() {
             scanner::scan_code_context_builder_project,
             scanner::cancel_code_context_builder_scan,
             scanner::read_file_contents,
-            scanner::read_multiple_file_contents, // Added new command
+            scanner::read_multiple_file_contents,
             utils::get_text_token_count,
             file_monitor::start_monitoring_project_cmd,
-            file_monitor::stop_monitoring_project_cmd
+            file_monitor::stop_monitoring_project_cmd,
+            app_settings::get_app_setting_cmd, // Added command
+            app_settings::set_app_setting_cmd  // Added command
         ])
         .run(context)
         .expect("error while running tauri application");

@@ -1,10 +1,12 @@
 
+/* src/App.css */
+
 :root {
-  /* Basic theme variables */
+  /* Basic theme variables (Dark theme by default) */
   --bg-color: #1e1e1e;
   --text-color: #ffffff;
   --accent-color: #396cd8;
-  --accent-color-rgb: 57, 108, 216; /* New: RGB for accent color */
+  --accent-color-rgb: 57, 108, 216;
   --border-color: #3a3a3a;
   --card-bg-color: #2b2b2b;
   --card-bg-color2: #272727;
@@ -12,23 +14,23 @@
   --transition-speed: 0.3s;
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;
-  color-scheme: dark;
-  --sidebar-bg-color: #112832; /* Let's use a slightly different color for the left panel */
-  --left-panel-bg-color: #1a2227; /* Darker for left panel */
+  color-scheme: dark; /* Base color scheme */
+  --sidebar-bg-color: #112832; 
+  --left-panel-bg-color: #1a2227; 
 
   /* Added from Standalone App CSS for compatibility */
-  --background-color: var(--bg-color); /* Map to PDK var */
-  --background-secondary-color: #1e1e1e; /* Darker for code areas */
-  --background-tertiary-color: #2d2d2d; /* Darker for modals */
-  --background-accent-color: #2b2b2b; /* Similar to card-bg */
-  --border-secondary-color: #444; /* Slightly lighter border */
-  --link-hover-color: #646cff; /* Keep standalone link hover */
+  --background-color: var(--bg-color); 
+  --background-secondary-color: #1e1e1e; 
+  --background-tertiary-color: #2d2d2d; 
+  --background-accent-color: #2b2b2b; 
+  --border-secondary-color: #444; 
+  --link-hover-color: #646cff; 
   --input-background-color: #333;
   --input-text-color: #eee;
   --label-text-color: #ccc;
   --disabled-opacity: 0.5;
-  --highlight-background-color: #695112; /* PDK Style Search Highlight */
-  --highlight-text-color: #eee; /* PDK Style Search Highlight Text */
+  --highlight-background-color: #695112; 
+  --highlight-text-color: #eee; 
   --overlay-background-color: rgba(0, 0, 0, 0.7);
   --modal-shadow-color: rgba(0, 0, 0, 0.3);
 
@@ -37,31 +39,132 @@
   --toast-success-text: lightgreen;
   --toast-error-bg: rgba(150, 70, 70, 0.9);
   --toast-error-text: var(--danger-color);
+
+  /* Settings Modal Specific */
+  --settings-modal-bg: var(--background-tertiary-color);
+  --settings-modal-border: var(--border-color);
+  --settings-modal-header-border: var(--border-secondary-color);
+  --settings-modal-radio-accent: var(--accent-color);
+}
+
+/* Light Theme Overrides - applied when html.theme-light is present */
+html.theme-light {
+  --bg-color: #ffffff;
+  --text-color: #213547;
+  /* --accent-color: #396cd8; */ /* Accent can stay same or change */
+  /* --accent-color-rgb: 57, 108, 216; */
+  --border-color: #ccc;
+  --card-bg-color: #f8f8f8;
+  --card-bg-color2: #f0f0f0;
+  --danger-color: #d33;
+  --left-panel-bg-color: #f0f4f8; 
+  --background-color: #ffffff;
+  --background-secondary-color: #f8f8f8;
+  --background-tertiary-color: #fdfdfd;
+  --background-accent-color: #f0f0f0;
+  --border-secondary-color: #ddd;
+  --link-hover-color: #747bff;
+  --input-background-color: #eee;
+  --input-text-color: #222;
+  --label-text-color: #555;
+  --highlight-background-color: #fff380;
+  --highlight-text-color: #333;
+  --overlay-background-color: rgba(255, 255, 255, 0.7);
+  --modal-shadow-color: rgba(0, 0, 0, 0.1);
+
+  --toast-success-bg: rgba(150, 230, 150, 0.9);
+  --toast-success-text: darkgreen;
+  --toast-error-bg: rgba(230, 150, 150, 0.9);
+  --toast-error-text: var(--danger-color);
+  
+  color-scheme: light; /* Update color scheme for light theme */
+
+  /* Component specific overrides for light theme */
+  /* Buttons */
+  button { background-color: #f9f9f9; color: var(--text-color); border: 1px solid var(--border-color); }
+  button:hover { background-color: var(--accent-color); color: #fff; border-color: var(--accent-color); }
+  button.delete-btn { background-color: var(--danger-color); border-color: var(--danger-color); color: #fff; }
+  button.delete-btn:hover { background-color: #b00; border-color: #b00; }
+  button:disabled { background-color: #e0e0e0; border-color: #d0d0d0; color: #999; }
+
+  .project-manager button.scan-btn-stale { border-color: var(--danger-color); color: var(--danger-color); }
+  .project-manager button.scan-btn-stale:hover { background-color: var(--danger-color); border-color: var(--danger-color); color: var(--bg-color); }
+  
+  .left-panel { border-right-color: var(--border-color); background-color: var(--left-panel-bg-color); }
+  .left-panel-project-manager { border-bottom-color: var(--border-color); }
+  .file-tree-main-content { background-color: var(--background-color); }
+  .file-tree-header { border-bottom-color: var(--border-secondary-color); }
+  .hotkeys-help-btn, .settings-btn { color: var(--label-text-color); } /* Apply to new settings button too */
+  .hotkeys-help-btn:hover, .settings-btn:hover { background-color: var(--card-bg-color); border-color: var(--border-color); color: var(--text-color); }
+
+  .aggregator-content { background-color: var(--input-background-color); border-color: var(--border-color); color: var(--text-color); }
+  .project-form { border-color: var(--border-color); background-color: var(--card-bg-color2); }
+  .aggregator-header { border-bottom-color: var(--border-secondary-color); }
+  .status-bar { background-color: #f0f0f0; border-top-color: var(--border-color); color: #555; }
+  .status-bar .status-warning { color: var(--danger-color); }
+
+  .file-tree-node:hover { background-color: rgba(0, 0, 0, 0.03); }
+  .file-tree-node.selected { background-color: rgba(var(--accent-color-rgb), 0.15); }
+  .file-tree-node.selected:hover { background-color: rgba(var(--accent-color-rgb), 0.25); }
+  .file-tree-node.search-focused-highlight { background-color: var(--accent-color) !important; color: #ffffff !important; }
+  .file-tree-node.search-focused-highlight .node-name,
+  .file-tree-node.search-focused-highlight .node-stats,
+  .file-tree-node.search-focused-highlight .node-stats span,
+  .file-tree-node.search-focused-highlight .node-icon,
+  .file-tree-node.search-focused-highlight .node-toggle { color: #ffffff !important; }
+  .file-tree-node.search-focused-highlight .node-name.highlight { background-color: var(--highlight-background-color) !important; color: var(--highlight-text-color) !important; box-shadow: 0 0 0 1px var(--text-color); }
+  
+  .node-name.highlight { background-color: var(--highlight-background-color); color: var(--highlight-text-color); }
+  .file-tree-node .node-name.stale { color: var(--danger-color); }
+  .file-tree-node.dir-contains-stale > .node-name:not(.stale) { color: #d66f00; }
+
+  .scan-overlay { color: #333; }
+  .scan-indicator { background-color: var(--background-tertiary-color); border: 1px solid var(--border-color); }
+  .scan-path { color: var(--label-text-color); }
+  .scan-indicator progress { accent-color: #4caf50; }
+  .scan-indicator progress::-webkit-progress-value { background-color: #4caf50; }
+  .scan-indicator progress::-moz-progress-bar { background-color: #4caf50; }
+
+  .file-viewer-modal-content { background-color: var(--background-tertiary-color); border: 1px solid var(--border-color); }
+  .file-viewer-modal-header button { background-color: #ddd; color: #333; border-color: #ccc; }
+  .file-viewer-modal-header button:hover { background-color: #ccc; }
+  .file-viewer-modal-body { background-color: var(--background-color); border-color: var(--border-color); color: var(--text-color); }
+  
+  .hotkeys-modal-content { background-color: var(--background-tertiary-color); border: 1px solid var(--border-color); }
+  .hotkeys-modal-header { border-bottom-color: var(--border-secondary-color); }
+  .hotkeys-modal-header button { background-color: #ddd; color: #333; border-color: #ccc; }
+  .hotkeys-modal-header button:hover { background-color: #ccc; }
+  .hotkeys-modal-body kbd { background-color: #eaeaea; border-color: #bdbdbd; color: #222; }
+
+  .save-status.saving { color: #555; background-color: rgba(180,180,180,0.5); }
+  .save-status.saved { color: darkgreen; background-color: rgba(150,230,150,0.3); }
+  .save-status.error { color: var(--danger-color); background-color: rgba(230,150,150,0.3); }
+
+  .node-stats { color: #555; }
+  .node-stats .lines, .node-stats .folder-total-lines { color: #388e3c; }
+  .node-stats .tokens, .node-stats .folder-total-tokens { color: #ef6c00; }
+  .node-stats .time { color: #1976d2; }
+  .node-stats .selected-count { color: #e6b400; }
+
+  /* Settings Modal Specific Light Theme */
+  --settings-modal-bg: var(--background-tertiary-color);
+  --settings-modal-border: var(--border-color);
+  --settings-modal-header-border: var(--border-secondary-color);
+  --settings-modal-radio-accent: var(--accent-color);
 }
 
 
 /* Universal Scrollbar Styling */
 /* Firefox */
 * {
-  scrollbar-width: thin; /* Makes the scrollbar slimmer */
-  scrollbar-color: #8470FF var(--bg-color); /* Thumb: light slate blue, Track: background color */
+  scrollbar-width: thin; 
+  scrollbar-color: #8470FF var(--bg-color); 
 }
 /* WebKit Browsers (Chrome, Edge, Safari) */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background-color: var(--bg-color); /* Using your background color for consistency */
-}
-::-webkit-scrollbar-thumb {
-  background-color: #8470FF; /* Light slate blue */
-  border-radius: 4px; /* Rounded corners for a sleeker look */
-  border: 2px solid var(--bg-color); /* Optional: adds spacing between thumb and track */
-}
-::-webkit-scrollbar-thumb:hover {
-  background-color: #935EFF; /* Slightly lighter blue on hover */
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background-color: var(--bg-color); }
+::-webkit-scrollbar-thumb { background-color: #8470FF; border-radius: 4px; border: 2px solid var(--bg-color); }
+::-webkit-scrollbar-thumb:hover { background-color: #935EFF; }
 
 
 /* Make the root fill the screen */
@@ -69,10 +172,10 @@ html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
-  overflow: hidden; /* Prevent vertical scroll on the entire UI */
+  overflow: hidden; 
   background-color: var(--bg-color);
   color: var(--text-color);
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif; /* Ensure font is set */
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif; 
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
@@ -86,69 +189,68 @@ html, body, #root {
    ========================================================================== */
 .app-container {
   display: flex;
-  flex-direction: column; /* Stack main layout and status bar vertically */
+  flex-direction: column; 
   height: 100vh;
   width: 100%;
   overflow: hidden;
   background-color: var(--background-color);
-  position: relative; /* Needed for absolute positioning of global toast */
+  position: relative; 
 }
 
 /* Wrapper for Sidebar + Main Content Area */
 .main-layout {
     display: flex;
-    flex-grow: 1; /* Takes up space above status bar */
+    flex-grow: 1; 
     overflow: hidden;
 }
 
 /* Left Panel (Project Manager + Aggregator) */
 .left-panel {
-  width: 380px; /* Adjust as needed */
-  min-width: 300px; /* Ensure it's usable when not fully collapsed */
+  width: 380px; 
+  min-width: 300px; 
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  height: 100%; /* Full height within main-layout */
+  height: 100%; 
   box-sizing: border-box;
   flex-shrink: 0;
   background-color: var(--left-panel-bg-color);
   transition: width 0.3s ease-in-out, min-width 0.3s ease-in-out, padding 0.3s ease-in-out;
-  overflow: hidden; /* Hide content when collapsing */
+  overflow: hidden; 
 }
 .left-panel.collapsed {
   width: 0px;
   min-width: 0px;
-  padding-left: 0; /* Remove padding when collapsed */
+  padding-left: 0; 
   padding-right: 0;
   border-right: none;
 }
-.left-panel > div { /* Direct children of left-panel */
+.left-panel > div { 
     padding: 1em;
     box-sizing: border-box;
 }
 .left-panel-project-manager {
-    /* ProjectManager will take its natural height or a defined flex basis */
-    flex-shrink: 0; /* Don't shrink ProjectManager area much */
-    border-bottom: 1px solid var(--border-color); /* Separator */
-    overflow-y: auto; /* Scroll if content too tall */
-    max-height: 50%; /* Example: allow PM to take up to 50% */
+    flex-shrink: 0; 
+    border-bottom: 1px solid var(--border-color); 
+    overflow-y: auto; 
+    max-height: 50%; 
 }
 .left-panel-aggregator {
-    flex-grow: 1; /* Aggregator takes remaining space */
+    flex-grow: 1; 
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Important for textarea to behave */
+    overflow: hidden; 
 }
 
 /* File Tree main content area (Right side of split) */
 .file-tree-main-content {
     flex: 1;
     display: flex;
-    flex-direction: column; /* Stack header and tree */
+    flex-direction: column; 
     overflow: hidden;
     height: 100%;
     box-sizing: border-box;
-    background-color: var(--background-secondary-color); /* Different bg to distinguish */
+    background-color: var(--background-secondary-color); 
 }
 .file-tree-header {
     display: flex;
@@ -156,30 +258,30 @@ html, body, #root {
     padding: 0.5em 1em;
     border-bottom: 1px solid var(--border-secondary-color);
     flex-shrink: 0;
-    gap: 0.5em; /* Default gap between direct children */
+    gap: 0.5em; 
 }
 .file-tree-header h3 {
-    margin: 0 0.5em 0 0; /* Give title some space to its right */
-    flex-shrink: 0; /* Prevent title from shrinking too much */
-    white-space: nowrap; /* Prevent title from wrapping if space is tight */
+    margin: 0 0.5em 0 0; 
+    flex-shrink: 0; 
+    white-space: nowrap; 
 }
 
 /* New container for search input and its specific buttons */
 .file-tree-search-controls {
     display: flex;
     align-items: center;
-    gap: 0.3em; /* Smaller gap for search controls */
-    margin-left: auto; /* Push search controls towards the right, before hotkey button */
+    gap: 0.3em; 
+    margin-left: auto; 
 }
 .file-tree-search-controls input {
-    width: 200px; /* Or your desired width */
+    width: 200px; 
     padding: 0.4em 0.6em;
-    margin: 0; /* Override default input margins if any */
+    margin: 0; 
     font-size: 0.9em;
 }
 .file-tree-search-controls button {
     padding: 0.4em;
-    font-size: 0.9em; /* Make icons/text smaller if needed */
+    font-size: 0.9em; 
     line-height: 1;
     min-width: auto;
     margin: 0;
@@ -193,30 +295,27 @@ html, body, #root {
     min-width: auto;
     margin: 0;
 }
-.hotkeys-help-btn { /* New button style */
+.hotkeys-help-btn, .settings-btn { /* Apply to new settings button */
     padding: 0.3em 0.6em;
     font-size: 1em;
     line-height: 1;
     min-width: auto;
-    /* margin-left: 0.5em; /* This will be auto due to search controls margin-left: auto */
     background-color: transparent;
     border: 1px solid transparent;
     color: var(--label-text-color);
-    margin-left: 0.5em; /* Add some space between search controls and help button */
-
+    margin-left: 0.5em; 
 }
-.hotkeys-help-btn:hover {
+.hotkeys-help-btn:hover, .settings-btn:hover { /* Apply to new settings button */
     background-color: var(--card-bg-color);
     border-color: var(--border-color);
     color: var(--text-color);
 }
-/* New: Scanning indicator in file tree header */
 .header-scanning-indicator {
   margin-left: 0.5em;
   font-size: 0.9em;
   font-style: italic;
   animation: pulseOpacity 1.5s infinite ease-in-out;
-  color: var(--accent-color); /* Start with accent color */
+  color: var(--accent-color); 
 }
 
 
@@ -224,473 +323,144 @@ html, body, #root {
    Component Styles
    ========================================================================== */
 
-/* --- Headings --- */
-h1, h2, h3, h4, h5, h6 {
-  margin-top: 0;
-  margin-bottom: 0.5em;
-  font-weight: 500;
-}
+h1, h2, h3, h4, h5, h6 { margin-top: 0; margin-bottom: 0.5em; font-weight: 500; }
 
-/* --- Buttons --- */
 button {
   cursor: pointer;
-  background-color: var(--card-bg-color); /* PDK button style */
+  background-color: var(--card-bg-color); 
   color: var(--text-color);
   border: 1px solid var(--border-color);
-  padding: 0.5rem 1rem; /* PDK padding */
-  border-radius: 6px; /* PDK radius */
+  padding: 0.5rem 1rem; 
+  border-radius: 6px; 
   transition: background-color var(--transition-speed), border-color var(--transition-speed), color var(--transition-speed), box-shadow var(--transition-speed);
-  margin: 0 4px; /* Default spacing */
-  font-size: 0.9em; /* Slightly smaller base button font */
+  margin: 0 4px; 
+  font-size: 0.9em; 
 }
-button:hover {
-  background-color: var(--accent-color); /* PDK hover */
-  border-color: var(--accent-color);
-}
-button:focus, button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-button:active {
-  opacity: 0.8;
-}
-button:disabled {
-  opacity: var(--disabled-opacity);
-  cursor: not-allowed;
-  background-color: #333; /* Dimmer background when disabled */
-  border-color: #444;
-}
-button.delete-btn { /* PDK delete style */
-  background-color: var(--danger-color);
-  border-color: var(--danger-color);
-}
-button.delete-btn:hover {
-  background-color: #d55;
-  border-color: #d55;
-}
+button:hover { background-color: var(--accent-color); border-color: var(--accent-color); }
+button:focus, button:focus-visible { outline: 4px auto -webkit-focus-ring-color; }
+button:active { opacity: 0.8; }
+button:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; background-color: #333; border-color: #444; }
+button.delete-btn { background-color: var(--danger-color); border-color: var(--danger-color); }
+button.delete-btn:hover { background-color: #d55; border-color: #d55; }
 
-/* --- Inputs, Select, Textarea --- */
 input, select, textarea {
-    background-color: var(--input-background-color); /* Use var */
-    color: var(--input-text-color); /* Use var */
+    background-color: var(--input-background-color); 
+    color: var(--input-text-color); 
     border: 1px solid var(--border-color);
-    padding: 0.5rem; /* Consistent padding */
+    padding: 0.5rem; 
     border-radius: 4px;
     transition: border-color var(--transition-speed);
     margin: 2px 0;
     box-sizing: border-box;
     font-family: inherit;
-    font-size: 1em; /* Match base font size */
+    font-size: 1em; 
 }
-input:focus, select:focus, textarea:focus {
-    border-color: var(--accent-color); /* Highlight focus */
-    outline: none;
-}
-input::placeholder, textarea::placeholder {
-    color: var(--label-text-color);
-    opacity: 0.7;
-}
-textarea {
-    width: 100%;
-    resize: vertical;
-    min-height: 60px;
-    font-family: monospace; /* Use monospace for code */
-}
+input:focus, select:focus, textarea:focus { border-color: var(--accent-color); outline: none; }
+input::placeholder, textarea::placeholder { color: var(--label-text-color); opacity: 0.7; }
+textarea { width: 100%; resize: vertical; min-height: 60px; font-family: monospace; }
 
-/* --- Labels --- */
-label {
-    display: block;
-    margin-bottom: 0.2em;
-    font-size: 0.9em;
-    color: var(--label-text-color);
-}
+label { display: block; margin-bottom: 0.2em; font-size: 0.9em; color: var(--label-text-color); }
 
 
 /* --------------------------------------------------------------------------
    Project Manager (in Left Panel)
    -------------------------------------------------------------------------- */
-.project-manager {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8em;
-}
-.project-manager h3 {
-    margin-bottom: 0.5em;
-    font-size: 1.1em;
-}
+.project-manager { display: flex; flex-direction: column; gap: 0.8em; }
+.project-manager h3 { margin-bottom: 0.5em; font-size: 1.1em; }
 
-/* New layout for Project Manager controls */
-.pm-row-select {
-  width: 100%;
-  margin-bottom: 0.5em; /* Space between dropdown and button row */
-}
-.pm-row-select select {
-  width: 100%; /* Make select full width */
-  padding: 0.4rem 0.6rem;
-  font-size: 0.9em;
-}
+.pm-row-select { width: 100%; margin-bottom: 0.5em; }
+.pm-row-select select { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.9em; }
 
-.pm-row-buttons {
-  display: flex;
-  justify-content: space-between; /* Pushes scan button to the right */
-  align-items: center;
-  width: 100%;
-  gap: 0.5em; /* Consistent gap */
-}
-.pm-buttons-group-left {
-  display: flex;
-  gap: 0.5em; /* Gap between New, Delete, Settings buttons */
-  align-items: center;
-}
+.pm-row-buttons { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 0.5em; }
+.pm-buttons-group-left { display: flex; gap: 0.5em; align-items: center; }
 
-/* General button styling within ProjectManager (was previously .project-controls button) */
-.project-manager button {
-  padding: 0.4rem 0.6rem;
-  font-size: 1em; /* For icons */
-  margin: 0; /* Remove default button margin */
-  line-height: 1; /* Better icon alignment */
-}
+.project-manager button { padding: 0.4rem 0.6rem; font-size: 1em; margin: 0; line-height: 1; }
 
-/* Specific styles for Scan button in ProjectManager */
-.project-manager button.scan-btn-stale {
-    border-color: var(--danger-color);
-    color: var(--danger-color);
-}
-.project-manager button.scan-btn-stale:hover {
-    background-color: var(--danger-color);
-    border-color: var(--danger-color);
-    color: var(--text-color);
-}
-.project-manager button.scan-btn-scanning {
-  animation: pulseBorder 1.5s infinite ease-in-out;
-  opacity: 1;
-  cursor: not-allowed;
-}
+.project-manager button.scan-btn-stale { border-color: var(--danger-color); color: var(--danger-color); }
+.project-manager button.scan-btn-stale:hover { background-color: var(--danger-color); border-color: var(--danger-color); color: var(--text-color); }
+.project-manager button.scan-btn-scanning { animation: pulseBorder 1.5s infinite ease-in-out; opacity: 1; cursor: not-allowed; }
 
 
-/* Project Form Styling (using PDK classes/structure) */
-.project-form {
-  margin-top: 0.8em;
-  border: 1px solid var(--border-color);
-  padding: 0.8em; /* Reduced padding */
-  border-radius: 4px;
-  background-color: var(--card-bg-color2);
-  display: flex;
-  flex-direction: column;
-  gap: 0.6em; /* Reduced gap */
-}
-.project-form .form-field { /* New wrapper for label + input */
-    display: flex;
-    flex-direction: column; /* Label above input */
-    gap: 0.2em;
-}
-.project-form label {
-    font-size: 0.85em;
-    margin-bottom: 0; /* No extra margin */
-    color: var(--label-text-color);
-}
-.project-form input[type="text"],
-.project-form textarea {
-    width: 100%; /* Full width */
-    padding: 0.4rem; /* Smaller padding */
-    font-size: 0.9em;
-}
-.project-form .input-with-button { /* For root folder + browse */
-    display: flex;
-    gap: 0.3em;
-}
-.project-form .input-with-button input {
-    flex-grow: 1;
-}
-.project-form button.browse-button {
-     padding: 0.4rem; /* Match input height */
-     font-size: 1em;
-     flex-shrink: 0;
-     margin: 0;
-     line-height: 1;
-     background-color: var(--card-bg-color);
-     border-color: var(--border-color);
-     min-width: auto;
- }
-.project-form button.browse-button:hover {
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
-}
+.project-form { margin-top: 0.8em; border: 1px solid var(--border-color); padding: 0.8em; border-radius: 4px; background-color: var(--card-bg-color2); display: flex; flex-direction: column; gap: 0.6em; }
+.project-form .form-field { display: flex; flex-direction: column; gap: 0.2em; }
+.project-form label { font-size: 0.85em; margin-bottom: 0; color: var(--label-text-color); }
+.project-form input[type="text"], .project-form textarea { width: 100%; padding: 0.4rem; font-size: 0.9em; }
+.project-form .input-with-button { display: flex; gap: 0.3em; }
+.project-form .input-with-button input { flex-grow: 1; }
+.project-form button.browse-button { padding: 0.4rem; font-size: 1em; flex-shrink: 0; margin: 0; line-height: 1; background-color: var(--card-bg-color); border-color: var(--border-color); min-width: auto; }
+.project-form button.browse-button:hover { background-color: var(--accent-color); border-color: var(--accent-color); }
 
-/* Save status display in ProjectManager */
-.save-status {
-    font-size: 0.8em;
-    padding: 0.2em 0.5em;
-    border-radius: 3px;
-    margin-left: 0.5em;
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-.save-status.visible {
-    opacity: 1;
-}
-.save-status.saving {
-    color: #ccc;
-    background-color: rgba(80,80,80,0.5);
-}
-.save-status.saved {
-    color: lightgreen;
-    background-color: rgba(70,150,70,0.3);
-}
-.save-status.error {
-    color: var(--danger-color);
-    background-color: rgba(150,70,70,0.3);
-}
+.save-status { font-size: 0.8em; padding: 0.2em 0.5em; border-radius: 3px; margin-left: 0.5em; opacity: 0; transition: opacity 0.3s; }
+.save-status.visible { opacity: 1; }
+.save-status.saving { color: #ccc; background-color: rgba(80,80,80,0.5); }
+.save-status.saved { color: lightgreen; background-color: rgba(70,150,70,0.3); }
+.save-status.error { color: var(--danger-color); background-color: rgba(150,70,70,0.3); }
 
 
 /* --------------------------------------------------------------------------
    File Tree Area (in file-tree-main-content)
    -------------------------------------------------------------------------- */
-.file-tree-container {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    height: 100%;
-    box-sizing: border-box;
-}
+.file-tree-container { width: 100%; display: flex; flex-direction: column; overflow: hidden; height: 100%; box-sizing: border-box; }
+.file-tree-scroll-area { flex-grow: 1; overflow-y: auto; overflow-x: hidden; padding: 0.5em 0 1em 0; }
+.file-tree { padding: 0; margin: 0; list-style: none; user-select: none; }
+.file-tree-node-li { padding-left: 0 !important; }
+.file-tree-node { padding: 1px 0; display: flex; align-items: center; gap: 5px; cursor: default; padding-left: calc(var(--node-level, 0) * 20px); border-radius: 3px; margin: 1px 4px 1px 4px; transition: background-color 0.15s ease-in-out; }
+.file-tree-node:hover { background-color: rgba(255, 255, 255, 0.05); }
 
-/* Scrollable area for the tree itself */
-.file-tree-scroll-area {
-    flex-grow: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 0.5em 0 1em 0;
-}
-
-.file-tree {
-    padding: 0;
-    margin: 0;
-    list-style: none;
-    user-select: none;
-}
-.file-tree-node-li {
-    padding-left: 0 !important;
-}
-.file-tree-node {
-    padding: 1px 0;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    cursor: default;
-    padding-left: calc(var(--node-level, 0) * 20px);
-    border-radius: 3px;
-    margin: 1px 4px 1px 4px;
-    transition: background-color 0.15s ease-in-out; /* Smooth transition for highlights */
-}
-.file-tree-node:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-}
-
-/* General search term match highlight (applied to multiple nodes if they contain the term) - NOT USED for row background currently */
-/* .file-tree-node.highlighted {
-    background-color: #444;
-} */
-
-/* Selected item highlight (checkbox is checked or indeterminate for folders) */
-.file-tree-node.selected {
-    background-color: rgba(var(--accent-color-rgb), 0.2); /* Subtle accent color */
-}
-.file-tree-node.selected:hover {
-    background-color: rgba(var(--accent-color-rgb), 0.3); /* Slightly more on hover */
-}
-
-/* Search focus highlight (for the single item actively focused by arrow keys) */
-.file-tree-node.search-focused-highlight {
-    background-color: var(--accent-color) !important; /* Use accent color, !important to ensure override */
-    color: var(--bg-color) !important; /* Ensure text is readable (e.g. white text on blue bg) */
-    /* outline: 1px solid var(--text-color); */ /* Optional: add an outline */
-}
-
-/* Ensure that the text color inside a search-focused node's name is also contrasted */
+.file-tree-node.selected { background-color: rgba(var(--accent-color-rgb), 0.2); }
+.file-tree-node.selected:hover { background-color: rgba(var(--accent-color-rgb), 0.3); }
+.file-tree-node.search-focused-highlight { background-color: var(--accent-color) !important; color: var(--bg-color) !important; }
 .file-tree-node.search-focused-highlight .node-name,
 .file-tree-node.search-focused-highlight .node-stats,
 .file-tree-node.search-focused-highlight .node-stats span,
 .file-tree-node.search-focused-highlight .node-icon,
-.file-tree-node.search-focused-highlight .node-toggle {
-    color: var(--bg-color) !important; /* Match the text color of the search-focused-highlight */
-}
-/* If the text part itself is highlighted (node-name.highlight) within a search-focused row */
-.file-tree-node.search-focused-highlight .node-name.highlight {
-    background-color: var(--highlight-background-color) !important; /* Keep its distinct background (#695112) */
-    color: var(--highlight-text-color) !important; /* Keep its distinct text color (#eee) */
-    box-shadow: 0 0 0 1px var(--text-color); /* Add a border to make it pop on accent bg */
-}
+.file-tree-node.search-focused-highlight .node-toggle { color: var(--bg-color) !important; }
+.file-tree-node.search-focused-highlight .node-name.highlight { background-color: var(--highlight-background-color) !important; color: var(--highlight-text-color) !important; box-shadow: 0 0 0 1px var(--text-color); }
 
-
-.node-toggle {
-    cursor: pointer;
-    width: 1em;
-    text-align: center;
-    flex-shrink: 0;
-    color: var(--label-text-color);
-    user-select: none;
-}
+.node-toggle { cursor: pointer; width: 1em; text-align: center; flex-shrink: 0; color: var(--label-text-color); user-select: none; }
 .node-toggle:hover { color: var(--text-color); }
 .node-toggle-placeholder { display: inline-block; width: 1em; flex-shrink: 0; }
 .node-checkbox { margin: 0 5px 0 0; flex-shrink: 0; cursor: pointer; width: 14px; height: 14px; accent-color: var(--accent-color); }
 .node-checkbox-placeholder { display: inline-block; width: 14px; height: 14px; margin: 0 5px 0 0; flex-shrink: 0; }
 .node-icon { margin-right: 3px; flex-shrink: 0; user-select: none; }
-
 .node-name { flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 1px 3px; border-radius: 2px; cursor: pointer; user-select: none; }
-.node-name.highlight { /* This is for the text part that matches the search term */
-    background-color: var(--highlight-background-color);
-    color: var(--highlight-text-color);
-    border-radius: 2px;
-    padding: 0 2px;
-    margin: 0 -2px; /* To make background seamless with text */
-}
+.node-name.highlight { background-color: var(--highlight-background-color); color: var(--highlight-text-color); border-radius: 2px; padding: 0 2px; margin: 0 -2px; }
 
-
-/* Existing .node-stats and sub-span styles remain the same */
 .node-stats { margin-left: auto; padding-left: 10px; font-size: 0.8em; color: #aaa; white-space: nowrap; flex-shrink: 0; }
 .node-stats span { margin-left: 6px; }
 .node-stats .lines { color: #6ef076; }
 .node-stats .tokens { color: #f0b76e; }
 .node-stats .time { color: #6ebbf0; }
-/* Updated selected-count color */
-.node-stats .selected-count { color: #ffd700; } /* Gold/Yellow */
-
-/* New styles for folder total stats (from previous update) */
-.node-stats .folder-total-lines,
-.node-stats .folder-total-tokens {
-  opacity: 0.75;
-}
-
-/* Styles for stale/out-of-date files */
-.file-tree-node .node-name.stale {
-  color: var(--danger-color);
-}
-.file-tree-node.dir-contains-stale > .node-icon {
-  opacity: 0.7;
-}
-.file-tree-node.dir-contains-stale > .node-name:not(.stale) {
-    color: #ffcc80;
-}
+.node-stats .selected-count { color: #ffd700; } 
+.node-stats .folder-total-lines, .node-stats .folder-total-tokens { opacity: 0.75; }
+.file-tree-node .node-name.stale { color: var(--danger-color); }
+.file-tree-node.dir-contains-stale > .node-icon { opacity: 0.7; }
+.file-tree-node.dir-contains-stale > .node-name:not(.stale) { color: #ffcc80; }
 
 
 /* --------------------------------------------------------------------------
    Aggregator Panel (in Left Panel)
    -------------------------------------------------------------------------- */
-   .left-panel-aggregator {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    box-sizing: border-box;
-    gap: 0.5em;
-}
+.left-panel-aggregator { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; gap: 0.5em; }
+.aggregator-header { display: flex; flex-direction: column; gap: 0.5em; align-items: flex-start; flex-shrink: 0; padding-bottom: 0.5em; border-bottom: 1px solid var(--border-secondary-color); }
+.aggregator-header h3 { margin: 0; font-size: 1.1em; }
+.aggregator-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8em; width: 100%; }
+.aggregator-controls .control-item { display: flex; align-items: center; gap: 0.4em; }
+.aggregator-controls .control-item label { display: inline-block; margin-bottom: 0; font-size: 0.9em; color: var(--label-text-color); white-space: nowrap; }
+.aggregator-controls .control-item select { padding: 0.3em 0.5em; font-size: 0.9em; margin: 0; }
+.aggregator-controls .control-item input[type="checkbox"] { padding: 0; margin: 0 0.2em 0 0; width: auto; height: auto; vertical-align: middle; }
+.aggregator-stats-display { font-size: 0.9em; color: var(--label-text-color); margin-left: auto; white-space: nowrap; padding-left: 0.5em; }
 
-.aggregator-header {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5em;
-    align-items: flex-start;
-    flex-shrink: 0;
-    padding-bottom: 0.5em;
-    border-bottom: 1px solid var(--border-secondary-color);
-}
-.aggregator-header h3 {
-    margin: 0;
-    font-size: 1.1em;
-}
-.aggregator-controls {
-    display: flex;
-    flex-wrap: wrap; /* Allow wrapping on small screens */
-    align-items: center;
-    gap: 0.8em; /* Gap between control groups */
-    width: 100%;
-}
-
-/* New styles for individual control groups and their elements */
-.aggregator-controls .control-item {
-    display: flex;
-    align-items: center;
-    gap: 0.4em; /* Gap between label and its control */
-}
-
-.aggregator-controls .control-item label {
-    display: inline-block; /* Override global block style for labels */
-    margin-bottom: 0; /* Remove default margin from global label style */
-    font-size: 0.9em;
-    color: var(--label-text-color);
-    white-space: nowrap; /* Prevent label text from wrapping */
-}
-
-.aggregator-controls .control-item select {
-    padding: 0.3em 0.5em; /* Consistent padding */
-    font-size: 0.9em;
-    margin: 0; /* Remove any default margin */
-}
-
-.aggregator-controls .control-item input[type="checkbox"] {
-    padding: 0; /* Checkboxes don't need padding */
-    margin: 0 0.2em 0 0; /* Adjust margin slightly for alignment */
-    width: auto; /* Override global input width if set */
-    height: auto; /* Override global input height if set */
-    vertical-align: middle; /* Align checkbox with label text */
-}
-
-.aggregator-stats-display { /* Renamed from .aggregator-header span */
-    font-size: 0.9em;
-    color: var(--label-text-color);
-    margin-left: auto; /* Push to the right */
-    white-space: nowrap;
-    padding-left: 0.5em; /* Add some space if it's near other controls */
-}
-
-
-.aggregator-content {
-    flex-grow: 1;
-    width: 100%;
-    box-sizing: border-box;
-    background-color: var(--input-background-color);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    padding: 0.5em;
-    font-size: 0.9em;
-    overflow: auto;
-    resize: none;
-    font-family: monospace;
-    white-space: pre;
-}
-.aggregator-content::placeholder {
-    color: #888;
-    font-style: italic;
-}
-
-.aggregator-actions {
-    text-align: right;
-    margin-top: 0.5em;
-    flex-shrink: 0;
-}
-.aggregator-actions button {
-    margin-left: 0.5em;
-    padding: 0.5rem 1rem;
-}
+.aggregator-content { flex-grow: 1; width: 100%; box-sizing: border-box; background-color: var(--input-background-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5em; font-size: 0.9em; overflow: auto; resize: none; font-family: monospace; white-space: pre; }
+.aggregator-content::placeholder { color: #888; font-style: italic; }
+.aggregator-actions { text-align: right; margin-top: 0.5em; flex-shrink: 0; }
+.aggregator-actions button { margin-left: 0.5em; padding: 0.5rem 1rem; }
 
 
 /* --------------------------------------------------------------------------
    Status Bar (Bottom of app-container)
    -------------------------------------------------------------------------- */
-.status-bar {
-  --status-bar-height: 30px;
-  height: var(--status-bar-height);
-  background-color: #222;
-  border-top: 1px solid var(--border-color);
-  padding: 0 1em;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.85em;
-  color: #ccc;
-  flex-shrink: 0;
-  box-sizing: border-box;
-}
+.status-bar { --status-bar-height: 30px; height: var(--status-bar-height); background-color: #222; border-top: 1px solid var(--border-color); padding: 0 1em; display: flex; align-items: center; justify-content: space-between; font-size: 0.85em; color: #ccc; flex-shrink: 0; box-sizing: border-box; }
 .status-bar-left, .status-bar-right { display: flex; gap: 1em; align-items: center; }
 .status-bar span { white-space: nowrap; }
 .status-bar .stat-files { color: #6ef076; }
@@ -698,11 +468,7 @@ label {
 .status-bar .stat-lines { color: #6ef076; }
 .status-bar .stat-tokens { color: #f0b76e; }
 .status-bar .stat-time { color: #6ebbf0; }
-.status-bar .status-warning { /* For stale scan indication */
-    color: var(--danger-color);
-    font-weight: bold;
-    margin-left: 0.5em; /* Adjust spacing as needed */
-}
+.status-bar .status-warning { color: var(--danger-color); font-weight: bold; margin-left: 0.5em; }
 
 
 /* ==========================================================================
@@ -718,7 +484,6 @@ label {
 .scan-path { font-size: 0.8em; color: var(--label-text-color); margin-top: 0.5em; margin-bottom: 1em; max-width: 400px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: ltr; }
 .scan-indicator button { margin-top: 1em; padding: 0.5rem 1rem; }
 
-/* --- File Viewer Modal --- */
 .file-viewer-modal-overlay { position: fixed; inset: 0; background-color: var(--overlay-background-color); display: flex; align-items: center; justify-content: center; z-index: 1050; }
 .file-viewer-modal-content { background-color: var(--background-tertiary-color); padding: 1em; border-radius: 8px; border: 1px solid var(--border-color); width: 80%; max-width: 1000px; height: 80%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 5px 15px var(--modal-shadow-color); }
 .file-viewer-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8em; flex-shrink: 0; border-bottom: 1px solid var(--border-secondary-color); padding-bottom: 0.5em; }
@@ -729,231 +494,49 @@ label {
 .file-viewer-modal-body p { padding: 1em; text-align: center; white-space: pre-wrap; color: #aaa; font-style: italic; }
 .file-viewer-modal-body pre { margin: 0; }
 
-/* --- Hotkeys Modal --- */
-.hotkeys-modal-overlay { position: fixed; inset: 0; background-color: var(--overlay-background-color); display: flex; align-items: center; justify-content: center; z-index: 1060; } /* Higher z-index than file viewer */
+.hotkeys-modal-overlay { position: fixed; inset: 0; background-color: var(--overlay-background-color); display: flex; align-items: center; justify-content: center; z-index: 1060; }
 .hotkeys-modal-content { background-color: var(--background-tertiary-color); padding: 1.5em; border-radius: 8px; border: 1px solid var(--border-color); width: auto; min-width: 400px; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 5px 15px var(--modal-shadow-color); }
 .hotkeys-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em; flex-shrink: 0; border-bottom: 1px solid var(--border-secondary-color); padding-bottom: 0.8em; }
 .hotkeys-modal-header h4 { margin: 0; font-size: 1.2em; }
 .hotkeys-modal-header button { padding: 0.3em 0.8em; background-color: var(--card-bg-color); border: 1px solid var(--border-color); margin: 0; }
 .hotkeys-modal-header button:hover { background-color: var(--accent-color); border-color: var(--accent-color); }
-.hotkeys-modal-body { flex-grow: 1; overflow-y: auto; font-size: 0.95em; padding-right: 0.5em; /* Space for scrollbar */ }
+.hotkeys-modal-body { flex-grow: 1; overflow-y: auto; font-size: 0.95em; padding-right: 0.5em; }
 .hotkeys-modal-body ul { list-style: none; padding-left: 0; margin: 0; }
 .hotkeys-modal-body li { margin-bottom: 0.7em; line-height: 1.4; }
-.hotkeys-modal-body ul ul { padding-left: 1.5em; margin-top: 0.5em; } /* Nested list styling */
+.hotkeys-modal-body ul ul { padding-left: 1.5em; margin-top: 0.5em; } 
 .hotkeys-modal-body hr { border: none; border-top: 1px solid var(--border-secondary-color); margin: 1em 0; }
-.hotkeys-modal-body kbd {
-  background-color: #383838; /* Slightly different from input for distinction */
-  border: 1px solid #555;
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  padding: 0.2em 0.5em;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  font-size: 0.9em;
-  box-shadow: 0 1px 1px rgba(0,0,0,0.15);
-  margin: 0 0.15em;
-  white-space: nowrap;
-  color: var(--input-text-color);
-}
-.hotkeys-modal-body small {
-    color: var(--label-text-color);
-    font-size: 0.9em;
-    display: inline-block; /* Or block with margin if needed */
-    margin-left: 0.5em;
-}
-.hotkeys-modal-body i { /* For italicized context notes like (File Tree focused) */
-    color: var(--label-text-color);
-    font-size: 0.9em;
-    margin-left: 0.3em;
-}
+.hotkeys-modal-body kbd { background-color: #383838; border: 1px solid #555; border-bottom-width: 2px; border-radius: 4px; padding: 0.2em 0.5em; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size: 0.9em; box-shadow: 0 1px 1px rgba(0,0,0,0.15); margin: 0 0.15em; white-space: nowrap; color: var(--input-text-color); }
+.hotkeys-modal-body small { color: var(--label-text-color); font-size: 0.9em; display: inline-block; margin-left: 0.5em; }
+.hotkeys-modal-body i { color: var(--label-text-color); font-size: 0.9em; margin-left: 0.3em; }
+
+/* --- Settings Modal --- */
+.settings-modal-overlay { position: fixed; inset: 0; background-color: var(--overlay-background-color); display: flex; align-items: center; justify-content: center; z-index: 1070; }
+.settings-modal-content { background-color: var(--settings-modal-bg); padding: 1.5em; border-radius: 8px; border: 1px solid var(--settings-modal-border); width: auto; min-width: 450px; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 5px 15px var(--modal-shadow-color); }
+.settings-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em; flex-shrink: 0; border-bottom: 1px solid var(--settings-modal-header-border); padding-bottom: 0.8em; }
+.settings-modal-header h4 { margin: 0; font-size: 1.2em; }
+.settings-modal-header button.close-btn { padding: 0.3em 0.8em; margin: 0; } /* Use global button styles */
+.settings-modal-body { flex-grow: 1; overflow-y: auto; font-size: 0.95em; padding-right: 0.5em; display: flex; flex-direction: column; gap: 1.5em; }
+.settings-modal-section { display: flex; flex-direction: column; gap: 0.5em; }
+.settings-modal-section h5 { font-size: 1em; margin-bottom: 0.3em; font-weight: 500; color: var(--text-color); }
+.settings-modal-section .theme-options { display: flex; gap: 1em; align-items: center; }
+.settings-modal-section .theme-options label { display: flex; align-items: center; gap: 0.3em; cursor: pointer; font-size: 0.95em; margin-bottom: 0; }
+.settings-modal-section .theme-options input[type="radio"] { margin: 0; width: auto; height: auto; accent-color: var(--settings-modal-radio-accent); }
+.settings-modal-section textarea { min-height: 120px; font-size: 0.9em; }
+.settings-modal-footer { margin-top: 1.5em; display: flex; justify-content: flex-end; gap: 0.8em; flex-shrink: 0; padding-top: 1em; border-top: 1px solid var(--settings-modal-header-border); }
+.settings-modal-footer button { padding: 0.5rem 1.2rem; }
+
 
 /* New: Global Copy Success Toast */
-.global-copy-success-toast {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--toast-success-bg);
-  color: var(--toast-success-text);
-  padding: 0.8em 1.5em;
-  border-radius: 6px;
-  box-shadow: 0 3px 10px var(--modal-shadow-color);
-  z-index: 2000; /* Above everything else */
-  font-size: 0.9em;
-  font-weight: 500;
-  opacity: 0;
-  animation: fadeInOutToast 2s ease-in-out forwards;
-  pointer-events: none; /* Don't block clicks */
-}
+.global-copy-success-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background-color: var(--toast-success-bg); color: var(--toast-success-text); padding: 0.8em 1.5em; border-radius: 6px; box-shadow: 0 3px 10px var(--modal-shadow-color); z-index: 2000; font-size: 0.9em; font-weight: 500; opacity: 0; animation: fadeInOutToast 2s ease-in-out forwards; pointer-events: none; }
 
-@keyframes fadeInOutToast {
-  0% { opacity: 0; transform: translate(-50%, -10px); }
-  10% { opacity: 1; transform: translate(-50%, 0); } /* Fade in quickly */
-  90% { opacity: 1; transform: translate(-50%, 0); } /* Hold */
-  100% { opacity: 0; transform: translate(-50%, -10px); } /* Fade out */
-}
+@keyframes fadeInOutToast { 0% { opacity: 0; transform: translate(-50%, -10px); } 10% { opacity: 1; transform: translate(-50%, 0); } 90% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -10px); } }
+@keyframes pulseOpacity { 0%, 100% { opacity: 1; color: var(--accent-color); } 50% { opacity: 0.6; color: var(--label-text-color); } }
+@keyframes pulseBorder { 0% { box-shadow: 0 0 0 0px rgba(var(--accent-color-rgb), 0.5); } 70% { box-shadow: 0 0 0 4px rgba(var(--accent-color-rgb), 0); } 100% { box-shadow: 0 0 0 0px rgba(var(--accent-color-rgb), 0); } }
 
-
-/* New Animations */
-@keyframes pulseOpacity {
-  0%, 100% { opacity: 1; color: var(--accent-color); }
-  50% { opacity: 0.6; color: var(--label-text-color); }
-}
-@keyframes pulseBorder {
-  0% { box-shadow: 0 0 0 0px rgba(var(--accent-color-rgb), 0.5); }
-  70% { box-shadow: 0 0 0 4px rgba(var(--accent-color-rgb), 0); }
-  100% { box-shadow: 0 0 0 0px rgba(var(--accent-color-rgb), 0); }
-}
-
-
-/* Utility Styles */
 .flex-row { display: flex; align-items: center; gap: 1rem; }
-.mt-1 { margin-top: 0.5rem; }
-.mt-2 { margin-top: 1rem; }
-.mb-1 { margin-bottom: 0.5rem; }
-.mb-2 { margin-bottom: 1rem; }
+.mt-1 { margin-top: 0.5rem; } .mt-2 { margin-top: 1rem; }
+.mb-1 { margin-bottom: 0.5rem; } .mb-2 { margin-bottom: 1rem; }
 
 
-/* Light Theme Overrides */
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg-color: #ffffff;
-    --text-color: #213547;
-    --accent-color: #396cd8;
-    --accent-color-rgb: 57, 108, 216; /* Same RGB for light theme */
-    --active-tab-bg-color: #e0e8f7;
-    --active-tab-border-color: #a0b3d7;
-    --border-color: #ccc;
-    --card-bg-color: #f8f8f8;
-    --card-bg-color2: #f0f0f0;
-    --danger-color: #d33;
-    --left-panel-bg-color: #f0f4f8; /* Lighter for left panel */
-    --background-color: #ffffff;
-    --background-secondary-color: #f8f8f8;
-    --background-tertiary-color: #fdfdfd;
-    --background-accent-color: #f0f0f0;
-    --border-secondary-color: #ddd;
-    --link-hover-color: #747bff;
-    --input-background-color: #eee;
-    --input-text-color: #222;
-    --label-text-color: #555;
-    --highlight-background-color: #fff380;
-    --highlight-text-color: #333;
-    --overlay-background-color: rgba(255, 255, 255, 0.7);
-    --modal-shadow-color: rgba(0, 0, 0, 0.1);
-
-    --toast-success-bg: rgba(150, 230, 150, 0.9);
-    --toast-success-text: darkgreen;
-    --toast-error-bg: rgba(230, 150, 150, 0.9);
-    --toast-error-text: var(--danger-color);
-  }
-
-  button { background-color: #f9f9f9; color: var(--text-color); border: 1px solid var(--border-color); }
-  button:hover { background-color: var(--accent-color); color: #fff; border-color: var(--accent-color); }
-  button.delete-btn { background-color: var(--danger-color); border-color: var(--danger-color); color: #fff; }
-  button.delete-btn:hover { background-color: #b00; border-color: #b00; }
-  button:disabled { background-color: #e0e0e0; border-color: #d0d0d0; color: #999; }
-
-  .project-manager button.scan-btn-stale {
-      border-color: var(--danger-color);
-      color: var(--danger-color);
-  }
-  .project-manager button.scan-btn-stale:hover {
-      background-color: var(--danger-color);
-      border-color: var(--danger-color);
-      color: var(--bg-color); /* Ensure contrast on hover for light theme */
-  }
-
-  .left-panel { border-right-color: var(--border-color); background-color: var(--left-panel-bg-color); }
-  .left-panel-project-manager { border-bottom-color: var(--border-color); }
-  .file-tree-main-content { background-color: var(--background-color); }
-  .file-tree-header { border-bottom-color: var(--border-secondary-color); }
-  .hotkeys-help-btn { color: var(--label-text-color); }
-  .hotkeys-help-btn:hover { background-color: var(--card-bg-color); border-color: var(--border-color); color: var(--text-color); }
-
-
-  .aggregator-content { background-color: var(--input-background-color); border-color: var(--border-color); color: var(--text-color); }
-  .project-form { border-color: var(--border-color); background-color: var(--card-bg-color2); }
-  .aggregator-header { border-bottom-color: var(--border-secondary-color); }
-  .status-bar { background-color: #f0f0f0; border-top-color: var(--border-color); color: #555; }
-  .status-bar .status-warning { color: var(--danger-color); }
-
-
-  .file-tree-node:hover { background-color: rgba(0, 0, 0, 0.03); }
-  /* .file-tree-node.highlighted { background-color: #eee; } */ /* General search term match highlight */
-  .file-tree-node.selected {
-      background-color: rgba(var(--accent-color-rgb), 0.15);
-  }
-  .file-tree-node.selected:hover {
-      background-color: rgba(var(--accent-color-rgb), 0.25);
-  }
-
-  /* Search focus highlight for light theme */
-  .file-tree-node.search-focused-highlight {
-      background-color: var(--accent-color) !important;
-      color: #ffffff !important; /* Explicitly white text on accent bg for light theme */
-      /* outline: 1px solid var(--text-color); */
-  }
-    .file-tree-node.search-focused-highlight .node-name,
-    .file-tree-node.search-focused-highlight .node-stats,
-    .file-tree-node.search-focused-highlight .node-stats span,
-    .file-tree-node.search-focused-highlight .node-icon,
-    .file-tree-node.search-focused-highlight .node-toggle {
-        color: #ffffff !important; /* Explicitly white text */
-    }
-    .file-tree-node.search-focused-highlight .node-name.highlight {
-        background-color: var(--highlight-background-color) !important; /* e.g., #fff380 */
-        color: var(--highlight-text-color) !important; /* e.g., #333 */
-        box-shadow: 0 0 0 1px var(--text-color); /* Add a border to make it pop on accent bg */
-    }
-
-
-  .node-name.highlight { background-color: var(--highlight-background-color); color: var(--highlight-text-color); }
-  .file-tree-node .node-name.stale { color: var(--danger-color); }
-  .file-tree-node.dir-contains-stale > .node-icon { opacity: 0.7; }
-  .file-tree-node.dir-contains-stale > .node-name:not(.stale) { color: #d66f00; } /* Adjusted orange for light theme */
-
-
-  .scan-overlay { color: #333; }
-  .scan-indicator { background-color: var(--background-tertiary-color); border: 1px solid var(--border-color); }
-  .scan-path { color: var(--label-text-color); }
-  .scan-indicator progress { accent-color: #4caf50; }
-  .scan-indicator progress::-webkit-progress-value { background-color: #4caf50; }
-  .scan-indicator progress::-moz-progress-bar { background-color: #4caf50; }
-
-  .file-viewer-modal-content { background-color: var(--background-tertiary-color); border: 1px solid var(--border-color); }
-  .file-viewer-modal-header button { background-color: #ddd; color: #333; border-color: #ccc; }
-  .file-viewer-modal-header button:hover { background-color: #ccc; }
-  .file-viewer-modal-body { background-color: var(--background-color); border-color: var(--border-color); color: var(--text-color); }
-  .file-viewer-modal-body p { color: #777; }
-
-  .hotkeys-modal-content { background-color: var(--background-tertiary-color); border: 1px solid var(--border-color); }
-  .hotkeys-modal-header { border-bottom-color: var(--border-secondary-color); }
-  .hotkeys-modal-header button { background-color: #ddd; color: #333; border-color: #ccc; }
-  .hotkeys-modal-header button:hover { background-color: #ccc; }
-  .hotkeys-modal-body { color: var(--text-color); }
-  .hotkeys-modal-body kbd {
-    background-color: #eaeaea;
-    border-color: #bdbdbd;
-    color: #222;
-    box-shadow: 0 1px 1px rgba(0,0,0,0.1);
-  }
-  .hotkeys-modal-body small { color: var(--label-text-color); }
-  .hotkeys-modal-body i { color: var(--label-text-color); }
-  .hotkeys-modal-body hr { border-top-color: var(--border-secondary-color); }
-
-
-  .save-status.saving { color: #555; background-color: rgba(180,180,180,0.5); }
-  .save-status.saved { color: darkgreen; background-color: rgba(150,230,150,0.3); }
-  .save-status.error { color: var(--danger-color); background-color: rgba(230,150,150,0.3); }
-
-  .node-stats { color: #555; }
-  .node-stats .lines, .node-stats .folder-total-lines { color: #388e3c; }
-  .node-stats .tokens, .node-stats .folder-total-tokens { color: #ef6c00; }
-  .node-stats .time { color: #1976d2; }
-  .node-stats .selected-count { color: #e6b400; } /* Darker Gold/Yellow for light theme */
-
-  .node-stats .folder-total-lines,
-  .node-stats .folder-total-tokens {
-    opacity: 0.8;
-  }
-}
+/* REMOVED @media (prefers-color-scheme: light) block that used :root here, 
+   as theme variables are now controlled by html.theme-light class */

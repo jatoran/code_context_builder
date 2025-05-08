@@ -53,8 +53,6 @@ const HotkeysModal: React.FC<HotkeysModalProps> = ({ isOpen, onClose }) => {
                         </ul>
 
                         <hr />
-                        
-                        <li><i>File Explorer Buttons:</i></li>
                         <ul>
                             <li><b>Expand (▼) / Collapse (▲) Buttons:</b>
                                 <br />
@@ -74,9 +72,9 @@ const HotkeysModal: React.FC<HotkeysModalProps> = ({ isOpen, onClose }) => {
                         
                         <li><i>While File Explorer Search Input is Active:</i></li>
                         <ul>
-                            <li><kbd>Esc</kbd> : Clear Search & Unfocus Input</li>
                             <li><kbd>↓</kbd> / <kbd>↑</kbd> : Navigate Search Results</li>
                             <li><kbd>Enter</kbd> : Toggle Selection of Highlighted Result</li>
+                            <li><kbd>Esc</kbd> : Clear Search & Unfocus Input</li>
                         </ul>
                         
                         <hr />
