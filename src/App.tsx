@@ -627,7 +627,7 @@ function App() {
                         <button className="collapse-toggle-btn" onClick={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)} title={isLeftPanelCollapsed ? "Show Left Panel" : "Hide Left Panel"}>
                             {isLeftPanelCollapsed ? '▶' : '◀'}
                         </button>
-                        <h3>File Explorer {isScanning && <span className="header-scanning-indicator">(Scanning...)</span>}</h3>
+                        <h3>Project Files {isScanning && <span className="header-scanning-indicator">(Scanning...)</span>}</h3>
                         <div className="file-tree-search-controls">
                             <input 
                                 ref={searchInputRef} 
