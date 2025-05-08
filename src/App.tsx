@@ -527,14 +527,36 @@ function App() {
     const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
         const target = event.target as HTMLElement;
         const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
-        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); searchInputRef.current?.focus(); } 
-        else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'C') { event.preventDefault(); window.dispatchEvent(new CustomEvent('hotkey-copy-aggregated')); } 
-        else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'R') { event.preventDefault(); if (selectedProjectId > 0 && !isScanning) handleScanProject(); } 
-        else if (event.ctrlKey && event.key.toLowerCase() === 'a' && !isInputFocused) { event.preventDefault(); if (treeData && isMountedRef.current) setSelectedPaths(new Set(getAllFilePaths(treeData))); } 
-        else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'A' && !isInputFocused) { event.preventDefault(); if (isMountedRef.current) setSelectedPaths(new Set()); } 
-        else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'X' && !isInputFocused) { event.preventDefault(); if (isMountedRef.current) setSelectedPaths(new Set()); } 
-        else if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 'x' && !isInputFocused) { event.preventDefault(); if (isMountedRef.current) setSelectedPaths(new Set()); }
-    }, [treeData, selectedProjectId, isScanning, handleScanProject, searchInputRef]); 
+
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') { 
+            event.preventDefault(); 
+            searchInputRef.current?.focus(); 
+        } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'C') { 
+            event.preventDefault(); 
+            window.dispatchEvent(new CustomEvent('hotkey-copy-aggregated')); 
+        } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'R') { 
+            event.preventDefault(); 
+            if (selectedProjectId > 0 && !isScanning) handleScanProject(); 
+        } else if (event.ctrlKey && event.key.toLowerCase() === 'a' && !isInputFocused) { 
+            event.preventDefault(); 
+            if (treeData && isMountedRef.current) setSelectedPaths(new Set(getAllFilePaths(treeData))); 
+        } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'A' && !isInputFocused) { 
+            event.preventDefault(); 
+            if (isMountedRef.current) setSelectedPaths(new Set()); 
+        } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'X' && !isInputFocused) { 
+            event.preventDefault(); 
+            if (isMountedRef.current) setSelectedPaths(new Set()); 
+        } else if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 'x' && !isInputFocused) { 
+            event.preventDefault(); 
+            if (isMountedRef.current) setSelectedPaths(new Set()); 
+        } else if (event.ctrlKey && event.key === 'ArrowDown' && !isInputFocused) {
+            event.preventDefault();
+            fileTreeRef.current?.expandTreeLevel(true); // true for expand all
+        } else if (event.ctrlKey && event.key === 'ArrowUp' && !isInputFocused) {
+            event.preventDefault();
+            fileTreeRef.current?.collapseTreeLevel(true); // true for collapse all
+        }
+    }, [treeData, selectedProjectId, isScanning, handleScanProject, searchInputRef, fileTreeRef]); 
 
     useEffect(() => { window.addEventListener('keydown', handleGlobalKeyDown); return () => window.removeEventListener('keydown', handleGlobalKeyDown); }, [handleGlobalKeyDown]);
     const treeStats = useMemo(() => calculateTreeStats(treeData), [treeData]);

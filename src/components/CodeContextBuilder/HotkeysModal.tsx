@@ -50,11 +50,13 @@ const HotkeysModal: React.FC<HotkeysModalProps> = ({ isOpen, onClose }) => {
                                 <br />
                                 <small><i>(Note: <kbd>Ctrl</kbd>+<kbd>X</kbd> may conflict with system 'Cut' if text is selected elsewhere)</i></small>
                             </li>
+                            <li><kbd>Ctrl</kbd> + <kbd>↓</kbd> : Expand All Directories</li>
+                            <li><kbd>Ctrl</kbd> + <kbd>↑</kbd> : Collapse All Directories</li>
                         </ul>
 
                         <hr />
                         <ul>
-                            <li><b>Expand (▼) / Collapse (▲) Buttons:</b>
+                            <li><b>Expand (▼) / Collapse (▲) Buttons in File Explorer Header:</b>
                                 <br />
                                 <small>
                                     - <kbd>Click</kbd>: Expand/Collapse current deepest expanded level or next level from root.

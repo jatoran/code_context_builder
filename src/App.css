@@ -1,4 +1,5 @@
 
+
 /* src/App.css */
 
 :root {
@@ -594,9 +595,17 @@ html.theme-light .save-status.error {
 .file-viewer-modal-header h4 { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.1em; }
 .file-viewer-modal-header button { padding: 0.3em 0.8em; background-color: var(--card-bg-color); border: 1px solid var(--border-color); margin: 0; }
 .file-viewer-modal-header button:hover { background-color: var(--accent-color); border-color: var(--accent-color); }
-.file-viewer-modal-body { flex-grow: 1; overflow: auto; background-color: var(--background-secondary-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.8em; font-family: monospace; white-space: pre; font-size: 0.9em; color: var(--text-color); }
+.file-viewer-modal-body {
+    flex-grow: 1;
+    overflow: auto;
+    background-color: var(--background-secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0; /* MODIFIED: SyntaxHighlighter will control its internal padding */
+    /* font-family, font-size, white-space, color will be managed by SyntaxHighlighter */
+}
 .file-viewer-modal-body p { padding: 1em; text-align: center; white-space: pre-wrap; color: #aaa; font-style: italic; }
-.file-viewer-modal-body pre { margin: 0; }
+.file-viewer-modal-body pre { margin: 0; } /* Ensures SyntaxHighlighter's <pre> has no extra margin */
 
 .hotkeys-modal-overlay { position: fixed; inset: 0; background-color: var(--overlay-background-color); display: flex; align-items: center; justify-content: center; z-index: 1060; }
 .hotkeys-modal-content { background-color: var(--background-tertiary-color); padding: 1.5em; border-radius: 8px; border: 1px solid var(--border-color); width: auto; min-width: 400px; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 5px 15px var(--modal-shadow-color); }

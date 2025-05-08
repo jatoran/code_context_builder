@@ -1,9 +1,11 @@
 
 // src/components/CodeContextBuilder/FileViewerModal.tsx
-// Update styling to match PDK modal style
-
-import React, { useState, useEffect, useRef } from 'react'; // Added useRef
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { getLanguageFromPath } from './Aggregator/aggregatorUtils'; // CORRECTED PATH
+
 
 interface FileViewerModalProps {
     filePath: string;
@@ -67,10 +69,10 @@ const FileViewerModal: React.FC<FileViewerModalProps> = ({ filePath, onClose }) 
         };
     }, [onClose]);
 
-    const shortFileName = filePath.split(/[\\/]/).pop() || filePath;
+    const shortFileName = useMemo(() => filePath.split(/[\\/]/).pop() || filePath, [filePath]);
+    const language = useMemo(() => getLanguageFromPath(filePath) || 'text', [filePath]);
 
     return (
-        // Use CSS classes from App.css (PDK style)
         <div className="file-viewer-modal-overlay" onClick={onClose}>
             <div className="file-viewer-modal-content" onClick={(e) => e.stopPropagation()}>
                 <div className="file-viewer-modal-header">
@@ -81,7 +83,29 @@ const FileViewerModal: React.FC<FileViewerModalProps> = ({ filePath, onClose }) 
                     {isLoading && <p>Loading content...</p>}
                     {error && <p style={{ color: 'red', whiteSpace: 'pre-wrap' }}>Error: {error}</p>}
                     {!isLoading && !error && content && (
-                        <pre>{content}</pre>
+                        <SyntaxHighlighter
+                            language={language}
+                            style={vscDarkPlus}
+                            showLineNumbers
+                            wrapLines={true} // Or wrapLongLines={true} for smarter wrapping
+                            lineNumberStyle={{ color: '#858585', minWidth: '3.25em', userSelect: 'none' }}
+                            customStyle={{ 
+                                margin: 0, 
+                                padding: '1em', 
+                                flex: 1, // If parent is flex and this should grow
+                                minHeight: '0', // Necessary for flex item to shrink correctly in some cases
+                                fontSize: '0.9em', // Example font size
+                                fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace', // Ensure monospace
+                            }}
+                            codeTagProps={{
+                                style: { 
+                                    fontFamily: 'inherit', // Inherit from customStyle
+                                    fontSize: 'inherit' // Inherit from customStyle
+                                }
+                            }}
+                        >
+                            {String(content)}
+                        </SyntaxHighlighter>
                     )}
                      {!isLoading && !error && !content && (
                         <p><i>File is empty or could not be read.</i></p>
