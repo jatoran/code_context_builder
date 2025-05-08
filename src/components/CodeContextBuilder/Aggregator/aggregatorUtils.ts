@@ -134,7 +134,7 @@ function buildFormattedTreeRecursiveInternal(
     }
         
     if (format === 'markdown') {
-        output += `${prefix}${node.is_dir ? '📁' : '📄'} ${escapeXml(node.name)}${node.is_dir ? '/' : ''}\n`;
+        output += `${prefix}${node.is_dir ? '📁' : ''} ${escapeXml(node.name)}${node.is_dir ? '/' : ''}\n`;
     } else if (format === 'xml') {
         const indent = '  '.repeat(depth);
         if (node.is_dir) {
@@ -195,7 +195,7 @@ function buildFullFormattedTreeRecursiveInternal(
     const displayName = node.is_dir && !node.name.endsWith('/') ? `${node.name}/` : node.name;
 
     if (format === 'markdown') {
-        output += `${prefix}${node.is_dir ? '📁' : '📄'} ${escapeXml(displayName)}\n`;
+        output += `${prefix}${node.is_dir ? '📁' : ''} ${escapeXml(displayName)}\n`;
     } else if (format === 'xml') {
         const indent = '  '.repeat(depth); // XML uses its own indentation logic separate from prefix
         if (node.is_dir) {
@@ -239,7 +239,7 @@ export function generateFullScannedFileTree(
 
     if (format === 'markdown') {
         treeString = `# File Tree\n\n`;
-        treeString += `${rootNode.is_dir ? '📁' : '📄'} ${escapeXml(initialDisplayName)}\n`;
+        treeString += `${rootNode.is_dir ? '📁' : ''} ${escapeXml(initialDisplayName)}\n`;
     } else if (format === 'xml') {
         treeString = `<fileTree type="full">\n`;
         // For XML, the recursive function handles the root wrapper itself if called with depth 0 for the root node data
@@ -283,7 +283,7 @@ export function generateFormattedFileTree(
 
     if (format === 'markdown') {
         treeString = `# Selected File Tree\n\n`;
-        treeString += `${rootNode.is_dir ? '📁' : '📄'} ${escapeXml(rootDisplayName)}\n`;
+        treeString += `${rootNode.is_dir ? '📁' : ''} ${escapeXml(rootDisplayName)}\n`;
     } else if (format === 'xml') {
         treeString = `<fileTree type="selected">\n`; // Changed type to selected for clarity
          // For XML, the recursive function handles the root wrapper itself if called with depth 0 for the root node data
