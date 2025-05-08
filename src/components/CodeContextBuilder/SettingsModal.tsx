@@ -11,64 +11,175 @@ interface SettingsModalProps {
     onThemeChange: (theme: ThemeSetting) => void;
 }
 
+// src/components/CodeContextBuilder/SettingsModal.tsx (or wherever this constant lives)
+
 const DEFAULT_IGNORE_PATTERNS_TEXT = [
-    ".git",
-    // General test files (matches anywhere)
-    "*.test.*",
-    "*.spec.*",
+    // -------------------------------------------------------------------------
+    // Version Control & Dependency Management
+    // -------------------------------------------------------------------------
+    ".git/",                        // Git repository data
+    "node_modules/",                // Node.js dependencies
+    "package-lock.json",            // npm lock file (often committed, but can be a default ignore)
+    "yarn.lock",                    // Yarn lock file (often committed, but can be a default ignore)
+    "Cargo.lock",                   // Rust Cargo lock file
+    "poetry.lock",                  // Python Poetry lock file
+    "pnpm-lock.yaml",               // pnpm lock file
+    "uv.lock",                      // uv (Python) lock file
+    "Gemfile.lock",                 // Ruby Bundler lock file
+    "composer.lock",                // PHP Composer lock file
+    "go.sum",                       // Go module checksums (part of go.mod)
 
-    // Common directories (matches anywhere if name is 'node_modules', etc.)
-    "node_modules/",
-    ".git/",
-    ".godot/",
-    ".next/",
-    ".vscode/",
-    ".venv/", // Matches any .venv directory, common for Python
-    "pgsql/",
-    "__pycache__/", // More specific for Python cache, ensure trailing slash
-    "dist/",       // Often a build output directory, could be /dist/ if only at root
-    "assets/",     // Common assets folder, could be /assets/ if only at root
-    "target/",     // Common for Rust/Java, could be /target/ if only at root
-    "gen/",        // Common generated code dir, could be /gen/ if only at root
-    "icons/",
+    // -------------------------------------------------------------------------
+    // IDE / Editor Specific
+    // -------------------------------------------------------------------------
+    ".vscode/",                     // VS Code settings and cache
+    ".idea/",                       // IntelliJ IDEA project files
+    "*.iml",                        // IntelliJ IDEA module files
+    "*.suo",                        // Visual Studio solution user options
+    "*.user",                       // Visual Studio user-specific files
+    "*.code-workspace",             // VS Code multi-root workspace
+    ".DS_Store",                    // macOS Finder metadata
+    "Thumbs.db",                    // Windows image thumbnail cache
+    "desktop.ini",                  // Windows folder customization
 
-    // Specific Python virtual env at root (if different from generic .venv)
-    // Example: if you specifically want to ignore a venv ONLY at the project root:
-    // "/venv/", // This would ignore a top-level 'venv' folder
+    // -------------------------------------------------------------------------
+    // Build Output & Compiled Files
+    // -------------------------------------------------------------------------
+    "/dist/",                       // Common distribution folder (root level)
+    "/build/",                      // Common build folder (root level)
+    "/out/",                        // Common output folder (root level)
+    "/target/",                     // Common for Rust, Java (Maven/Gradle) (root level)
+    "/bin/",                        // Common binary output folder (root level)
+    "/obj/",                        // Common object file folder (root level)
+    "*.o",                          // Object files
+    "*.a",                          // Static libraries
+    "*.so",                         // Shared libraries (Linux)
+    "*.dylib",                      // Shared libraries (macOS)
+    "*.dll",                        // Shared libraries (Windows)
+    "*.exe",                        // Executables (Windows)
+    "*.com",                        // Executables (DOS/Windows)
+    "*.class",                      // Java compiled classes
+    "*.jar",                        // Java Archives
+    "*.war",                        // Java Web Archives
+    "*.ear",                        // Java Enterprise Archives
+    "*.nupkg",                      // NuGet packages
+    "*.nuget.props",                // NuGet generated props
+    "*.nupkg.sha512",               // NuGet package checksum
+    "*.nuspec",                     // NuGet specification
 
-    // Specific public folder at root (common in web projects)
-    "/public/",
+    // -------------------------------------------------------------------------
+    // Python Specific
+    // -------------------------------------------------------------------------
+    "__pycache__/",                 // Python bytecode cache
+    "pycache/",                     // Alternative Python bytecode cache (less common)
+    "*.pyc",                        // Compiled Python files (legacy)
+    "*.pyo",                        // Optimized compiled Python files (legacy)
+    "*.pyd",                        // C extensions for Python (Windows)
+    ".Python",                      // Virtualenv metadata
+    ".python-version",              // pyenv local version file
+    ".env/",                        // Common name for virtual environment directories
+    ".venv/",                       // Standard name for virtual environment directories
+    "env/",                         // Common name for virtual environment directories
+    "venv/",                        // Common name for virtual environment directories
+    "ENV/",
+    "VENV/",
+    "*.egg-info/",                  // Python egg build metadata
+    ".pytest_cache/",               // pytest cache
 
-    // Specific files (matches anywhere if filename is .gitignore, etc.)
+    // -------------------------------------------------------------------------
+    // Log Files & Test Reports
+    // -------------------------------------------------------------------------
+    "*.log",
+    "logs/",
+    "coverage/",                    // Code coverage reports
+    ".coverage",                    // Coverage data file
+    "htmlcov/",                     // HTML coverage reports
+    "test-results/",                // Common directory for test results
+    "junit.xml",                    // JUnit XML reports
+    "*.lcov",                       // LCOV coverage data
+
+    // -------------------------------------------------------------------------
+    // Temporary & Backup Files
+    // -------------------------------------------------------------------------
+    "*.tmp",
+    "*.temp",
+    "*~",                           // Backup files (e.g., Emacs, Vim)
+    "*.bak",
+    "*.swp",                        // Vim swap files
+    ".#*",                          // Emacs auto-save/lock files
+
+    // -------------------------------------------------------------------------
+    // Configuration & Secret Files (usually project-specific, but good defaults)
+    // -------------------------------------------------------------------------
+    ".env",                         // Environment variables (often contains secrets)
+    ".env.*.local",                 // Local environment overrides (e.g., .env.development.local)
+    // "secrets.yml",               // Example, if you have a common secrets file name
+    // "*.pem",                     // Private keys
+
+    // -------------------------------------------------------------------------
+    // Specific Frameworks / Tools
+    // -------------------------------------------------------------------------
+    // Godot Engine
+    ".godot/",                      // Godot project cache and import files
+    // "export_presets.cfg",        // Can be versioned or ignored depending on team workflow
+
+    // Next.js
+    ".next/",                       // Next.js build output and cache
+
+    // Other
+    ".cache/",                      // Generic cache folder, use with caution
+    ".svelte-kit/",                 // SvelteKit build output and cache
+    ".parcel-cache/",               // Parcel bundler cache
+
+    // -------------------------------------------------------------------------
+    // General Test File Patterns (more specific than just extension)
+    // -------------------------------------------------------------------------
+    "*.test.*",                     // e.g., component.test.js, utils.test.ts
+    "*.spec.*",                     // e.g., component.spec.js, service.spec.ts
+    "*-test.*",                     // e.g., component-test.js
+    "*-spec.*",                     // e.g., component-spec.js
+    "TEST-*.xml",                   // Common for some test runners
+
+    // -------------------------------------------------------------------------
+    // Static Assets / Public Folders (often at root)
+    // -------------------------------------------------------------------------
+    "/public/",                     // Common for web frameworks like Next, Create React App
+    "/static/admin/",               // Django static admin files (if collected to root)
+    // "assets/",                  // More generic, might be too broad if not anchored
+
+    // -------------------------------------------------------------------------
+    // Generated Files / Data
+    // -------------------------------------------------------------------------
+    "gen/",                         // Generic generated code folder
+    "generated/",
+    "*.csv",                        // Often data, can be large or sensitive
+    "*.tsv",
+    "*.json",                       // Be careful, only if they are large data files not config
+    "*.xml",                        // Same as JSON
+    "*.svg",                        // SVGs can be source assets or generated. If source, don't ignore.
+                                    // If mostly generated (e.g. from diagrams), then ignoring is fine.
+                                    // For this general list, let's assume they might be generated/large.
+    "*.pdf",                        // Generated documents
+    "*.zip",                        // Archives
+    "*.tar.gz",
+    "*.tgz",
+
+    // -------------------------------------------------------------------------
+    // Project Management / Documentation
+    // -------------------------------------------------------------------------
+    ".project",                     // Eclipse project file
+    ".classpath",                   // Eclipse classpath file
+    ".settings/",                   // Eclipse settings directory
+    ".devcontainer/",               // VS Code Dev Containers (sometimes committed, sometimes not)
+    ".history/",                    // VS Code Local History extension
+
+    // Add your .gitignore file itself, as it's a meta-file for git
+    // but not usually part of the code context you want to build.
     ".gitignore",
-    ".python-version",
-    "uv.lock",
-    "pyproject.toml",
-    "package-lock.json",
-    "Cargo.lock",
-    ".env", // Environment files, often at root but can be elsewhere
 
-    // File extensions (matches anywhere)
-    "*.ps1",
-    "*.vbs",
-    "*.exe",
-    "*.csv",
-    "*.code-workspace", // VSCode workspace files
-
-    // Less common 'pycache' without underscores. If __pycache__/ covers it, this might be redundant.
-    // If it's a distinct pattern you've seen, keep it. If it's a directory, use "pycache/".
-    "pycache/", // Assuming it's a directory
-
-    // Consider if some of these should be anchored to the root.
-    // For example, if 'dist' or 'target' should *only* be ignored
-    // if they are at the top level of the project, use:
-    // "/dist/",
-    // "/target/",
-
-    // If you had an item like "my_specific_folder_at_root_only", you'd use:
-    // "/my_specific_folder_at_root_only/",
-
-].join('\n');
+].filter((pattern, index, self) => pattern.trim() !== "" && self.indexOf(pattern) === index) // Remove empty lines and duplicates
+ .sort() // Optional: sort for consistency
+ .join('\n');
 
 
 
