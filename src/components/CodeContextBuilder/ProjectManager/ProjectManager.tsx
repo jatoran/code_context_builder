@@ -1,4 +1,3 @@
-
 // src/components/CodeContextBuilder/ProjectManager/ProjectManager.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Project } from '../../../types/projects';
@@ -98,7 +97,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     if (projectSelected && !isScanning) { 
       triggerAutoSave();
     }
-    // Cleanup for this effect is handled by the main unmount effect for saveTimeoutRef
   }, [projectTitle, rootFolder, ignoreText, projectSelected, isScanning, triggerAutoSave]);
 
 
@@ -135,15 +133,27 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
 
   return (
     <div className="project-manager">
-      <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-        <h3>Project Manager</h3>
+      {/* Combined row for Project Label and Save Status */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '1.2em' /* Ensure minimum height for the row */ }}>
+        <label 
+            htmlFor="projectSelectorDropdown" 
+            style={{ 
+                fontSize: '0.9em', 
+                color: 'var(--label-text-color)', 
+                marginBottom: '0' /* Override global label margin */ 
+            }}
+        >
+          Project:
+        </label>
         {projectSelected && saveStatus !== 'idle' && (
             <span className={`save-status ${saveStatus} visible`}>{getSaveStatusMessage()}</span>
         )}
       </div>
-
+      
+      {/* Project selection dropdown */}
       <div className="pm-row-select">
         <select
+          id="projectSelectorDropdown"
           value={selectedProjectId}
           onChange={(e) => onProjectSelect(Number(e.target.value))}
           disabled={!hasProjects || isScanning}
@@ -158,6 +168,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         </select>
       </div>
 
+      {/* Row for action buttons (New, Delete, Settings, Scan) */}
       <div className="pm-row-buttons">
         <div className="pm-buttons-group-left">
           <button onClick={onCreateProject} disabled={isScanning} title="Create a new project">➕</button>
@@ -180,6 +191,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         </button>
       </div>
 
+      {/* Conditional display of Project Settings Form */}
       {showSettings && projectSelected && (
         <ProjectManagerForm
           projectTitle={projectTitle}

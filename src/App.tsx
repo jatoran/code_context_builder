@@ -584,7 +584,7 @@ function App() {
         }
         const newTitle = prompt("Enter new project title:");
         if (newTitle && newTitle.trim()) {
-             const DEFAULT_IGNORE = [ "*.test.*", "*.spec.*", "node_modules", ".git", "/venv/", ".godot", "/public/", ".next", ".vscode", ".venv", "pgsql", "*__pycache__", ".gitignore", "*.ps1", "*.vbs", ".python-version", "uv.lock", "pyproject.toml", "/dist/", "/assets/", ".exe", "pycache", ".csv", ".env", "*package-lock.json", "*.code-workspace", "/target/","/gen/"];
+             const DEFAULT_IGNORE = [ "*.test.*", "*.spec.*", "node_modules", ".git", "/venv/", ".godot", "/public/", ".next", ".vscode", ".venv", "pgsql", "*__pycache__", ".gitignore", "*.ps1", "*.vbs", ".python-version", "uv.lock", "pyproject.toml", "/dist/", "/assets/", ".exe", "pycache", ".csv", ".env", "package-lock.json", "*.code-workspace", "/target/","/gen/", "icons", "Cargo.lock"];
             const newProjectData: Partial<Omit<Project, 'id' | 'updated_at'>> = {
                 title: newTitle.trim(),
                 root_folder: null,
