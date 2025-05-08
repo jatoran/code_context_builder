@@ -24,7 +24,7 @@ interface AggregatorSettings {
 interface UseAggregatorProps {
     treeData: FileNode | null;
     selectedPaths: Set<string>;
-    selectedProfileId: number | null;
+    selectedProjectId: number | null;
 }
 
 // Type for the result of a single file read in the batch response
@@ -90,7 +90,7 @@ const collectFilePathsForAggregation = (
 };
 
 
-export function useAggregator({ treeData, selectedPaths, selectedProfileId }: UseAggregatorProps): UseAggregatorReturn {
+export function useAggregator({ treeData, selectedPaths, selectedProjectId }: UseAggregatorProps): UseAggregatorReturn {
     const isMountedRef = useRef(true); // For mounted check within the hook
 
     const [aggregatedText, setAggregatedText] = useState<string>('');
@@ -110,9 +110,9 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
     }, []); // Runs once when the hook is used by a component
 
     useEffect(() => {
-        if (selectedProfileId && selectedProfileId > 0) {
+        if (selectedProjectId && selectedProjectId > 0) {
             try {
-                const storedSettingsRaw = localStorage.getItem(`ccb_agg_settings_${selectedProfileId}`);
+                const storedSettingsRaw = localStorage.getItem(`ccb_agg_settings_${selectedProjectId}`);
                 if (storedSettingsRaw) {
                     const settings: AggregatorSettings = JSON.parse(storedSettingsRaw);
                     if (isMountedRef.current) {
@@ -126,7 +126,7 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
                      }
                 }
             } catch (e) {
-                console.error("Failed to parse aggregator settings from localStorage for profile " + selectedProfileId, e);
+                console.error("Failed to parse aggregator settings from localStorage for project " + selectedProjectId, e);
                 if (isMountedRef.current) {
                     setCurrentSelectedFormat('markdown');
                     setCurrentPrependFileTree(false);
@@ -138,33 +138,33 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
                 setCurrentPrependFileTree(false);
             }
         }
-    }, [selectedProfileId]);
+    }, [selectedProjectId]);
 
     const handleSetSelectedFormat = useCallback((format: OutputFormat) => {
         if (isMountedRef.current) setCurrentSelectedFormat(format);
-        if (selectedProfileId && selectedProfileId > 0) {
+        if (selectedProjectId && selectedProjectId > 0) {
             const newSettings: AggregatorSettings = { format, prependTree: currentPrependFileTree };
             try {
-                localStorage.setItem(`ccb_agg_settings_${selectedProfileId}`, JSON.stringify(newSettings));
+                localStorage.setItem(`ccb_agg_settings_${selectedProjectId}`, JSON.stringify(newSettings));
             } catch (e) { console.error("Failed to save aggregator format to localStorage", e); }
         }
-    }, [selectedProfileId, currentPrependFileTree]);
+    }, [selectedProjectId, currentPrependFileTree]);
 
     const handleSetPrependFileTree = useCallback((prepend: boolean) => {
         if (isMountedRef.current) setCurrentPrependFileTree(prepend);
-        if (selectedProfileId && selectedProfileId > 0) {
+        if (selectedProjectId && selectedProjectId > 0) {
             const newSettings: AggregatorSettings = { format: currentSelectedFormat, prependTree: prepend };
             try {
-                localStorage.setItem(`ccb_agg_settings_${selectedProfileId}`, JSON.stringify(newSettings));
+                localStorage.setItem(`ccb_agg_settings_${selectedProjectId}`, JSON.stringify(newSettings));
             } catch (e) { console.error("Failed to save aggregator prependTree to localStorage", e); }
         }
-    }, [selectedProfileId, currentSelectedFormat]);
+    }, [selectedProjectId, currentSelectedFormat]);
 
     const buildAggregatedContentRecursive = useCallback(async (
         currentNode: FileNode,
         currentMarkDownDepth: number,
         formatToUse: OutputFormat,
-        profileRootPath: string,
+        projectRootPath: string,
         fileContentsMap: BatchFileContentsResponse // Pass the map of fetched contents
     ): Promise<string> => {
         let builtContent = "";
@@ -183,7 +183,7 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
         });
     
         for (const childNode of relevantChildren) {
-            const displayPath = getRelativePath(childNode.path, profileRootPath);
+            const displayPath = getRelativePath(childNode.path, projectRootPath);
 
             if (!childNode.is_dir) {
                 const lang = getLanguageFromPath(childNode.path);
@@ -206,7 +206,7 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
             } else { // Directory
                 builtContent += formatFolderHeader(childNode.name, displayPath, formatToUse, currentMarkDownDepth);
                 // Recursive call, passing down the map
-                builtContent += await buildAggregatedContentRecursive(childNode, currentMarkDownDepth + 1, formatToUse, profileRootPath, fileContentsMap);
+                builtContent += await buildAggregatedContentRecursive(childNode, currentMarkDownDepth + 1, formatToUse, projectRootPath, fileContentsMap);
                 builtContent += formatFolderFooter(formatToUse, currentMarkDownDepth);
             }
         }
@@ -234,7 +234,7 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
 
         const formatToUse = currentSelectedFormat;
         const prependToUse = currentPrependFileTree;
-        const profileRootAbsolutePath = treeData.path; 
+        const projectRootAbsolutePath = treeData.path; 
 
         if (prependToUse) {
             textForPrependedTree = generateFullScannedFileTree(treeData, formatToUse);
@@ -271,10 +271,10 @@ export function useAggregator({ treeData, selectedPaths, selectedProfileId }: Us
 
                 if (isDirRelevantForAggregation(treeData, selectedPaths)) {
                     aggregatedCoreContent += formatFolderHeader(treeData.name, rootDisplayPath, formatToUse, rootLevelDepth);
-                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth + 1, formatToUse, profileRootAbsolutePath, fileContentsMap);
+                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth + 1, formatToUse, projectRootAbsolutePath, fileContentsMap);
                     aggregatedCoreContent += formatFolderFooter(formatToUse, rootLevelDepth);
                 } else {
-                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth, formatToUse, profileRootAbsolutePath, fileContentsMap);
+                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth, formatToUse, projectRootAbsolutePath, fileContentsMap);
                 }
 
             } else if (selectedPaths.has(treeData.path)) { 

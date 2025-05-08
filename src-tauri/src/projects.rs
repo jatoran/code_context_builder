@@ -1,14 +1,14 @@
-// src-tauri/src/profiles.rs
+// src-tauri/src/projects.rs
 use crate::db::AppState;
-use crate::types::Profile; // Use the shared Profile struct from types.rs
+use crate::types::Project; // Use the shared Project struct from types.rs
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension, Result as SqlResult, Transaction};
 use serde_json;
 use tauri::{command, State};
 
-// Helper function to map a database row to a Profile struct
+// Helper function to map a database row to a Project struct
 // Adjust column indices based on the SELECT query
-fn map_row_to_profile(row: &rusqlite::Row<'_>) -> SqlResult<Profile> {
+fn map_row_to_project(row: &rusqlite::Row<'_>) -> SqlResult<Project> {
     let id: i32 = row.get(0)?;
     let title: String = row.get(1)?;
     let root_folder: Option<String> = row.get(2)?;
@@ -21,7 +21,7 @@ fn map_row_to_profile(row: &rusqlite::Row<'_>) -> SqlResult<Profile> {
     let ignore_patterns: Vec<String> = serde_json::from_str(&ignore_json).unwrap_or_default();
     // REMOVED: let allowed_patterns: Vec<String> = serde_json::from_str(&allowed_json).unwrap_or_default();
 
-    Ok(Profile {
+    Ok(Project {
         id,
         title,
         root_folder,
@@ -35,7 +35,7 @@ fn map_row_to_profile(row: &rusqlite::Row<'_>) -> SqlResult<Profile> {
 // --- Exposed Tauri Commands ---
 
 #[command]
-pub fn list_code_context_builder_profiles(state: State<AppState>) -> Result<Vec<Profile>, String> {
+pub fn list_code_context_builder_projects(state: State<AppState>) -> Result<Vec<Project>, String> {
     let conn_guard = state.conn.lock().map_err(|e| format!("DB lock failed: {}", e))?;
     let conn = &*conn_guard; // Dereference the MutexGuard
 
@@ -44,57 +44,57 @@ pub fn list_code_context_builder_profiles(state: State<AppState>) -> Result<Vec<
             // Query using the correct table name and adjusted columns
             r#"
             SELECT id, title, root_folder, ignore_patterns, updated_at, prefix
-            FROM code_context_builder_profiles
+            FROM code_context_builder_projects
             ORDER BY title COLLATE NOCASE
             "#,
         )
         .map_err(|e| format!("Prepare statement failed: {}", e))?;
 
-    let profile_iter = stmt
-        .query_map([], map_row_to_profile)
-        .map_err(|e| format!("Query profiles failed: {}", e))?;
+    let project_iter = stmt
+        .query_map([], map_row_to_project)
+        .map_err(|e| format!("Query projects failed: {}", e))?;
 
     // Collect results, handling potential errors during mapping
-    let mut profiles = Vec::new();
-    for result in profile_iter {
+    let mut projects = Vec::new();
+    for result in project_iter {
         match result {
-            Ok(profile) => profiles.push(profile),
-            Err(e) => return Err(format!("Failed to map profile row: {}", e)),
+            Ok(project) => projects.push(project),
+            Err(e) => return Err(format!("Failed to map project row: {}", e)),
         }
     }
-    Ok(profiles)
+    Ok(projects)
 }
 
 #[command]
-pub fn save_code_context_builder_profile(
+pub fn save_code_context_builder_project(
     state: State<AppState>,
-    profile: Profile, // Frontend sends the complete profile object (without allowed_patterns)
+    project: Project, // Frontend sends the complete project object (without allowed_patterns)
 ) -> Result<i32, String> {
     let conn_guard = state.conn.lock().map_err(|e| format!("DB lock failed for save: {}", e))?;
     let conn = &*conn_guard;
     let now = Utc::now().to_rfc3339(); // Get current time for updated_at
 
     // Serialize pattern arrays to JSON strings
-    let ignore_json = serde_json::to_string(&profile.ignore_patterns)
+    let ignore_json = serde_json::to_string(&project.ignore_patterns)
         .map_err(|e| format!("Failed to serialize ignore_patterns: {}", e))?;
     // REMOVED: let allowed_json = ...
 
     // Handle prefix
-    let prefix_val = profile.prefix.clone();
+    let prefix_val = project.prefix.clone();
 
     // Check if it's an update or insert based on ID
-    if profile.id <= 0 {
-        // --- Create new profile ---
+    if project.id <= 0 {
+        // --- Create new project ---
         let result = conn.execute(
             // Use the correct table name and adjusted columns/params
             r#"
-            INSERT INTO code_context_builder_profiles
+            INSERT INTO code_context_builder_projects
                 (title, root_folder, ignore_patterns, updated_at, prefix)
             VALUES (?1, ?2, ?3, ?4, ?5)
             "#,
             params![
-                profile.title,
-                profile.root_folder,
+                project.title,
+                project.root_folder,
                 ignore_json,
                 // REMOVED: allowed_json,
                 now,
@@ -103,58 +103,58 @@ pub fn save_code_context_builder_profile(
         );
         match result {
             Ok(_) => Ok(conn.last_insert_rowid() as i32), // Return the new ID
-            Err(e) => Err(format!("Failed to insert new profile: {}", e)),
+            Err(e) => Err(format!("Failed to insert new project: {}", e)),
         }
     } else {
-        // --- Update existing profile ---
+        // --- Update existing project ---
         let result = conn.execute(
             // Use the correct table name and adjusted columns/params in SET
             r#"
-            UPDATE code_context_builder_profiles
+            UPDATE code_context_builder_projects
             SET title = ?1, root_folder = ?2, ignore_patterns = ?3, updated_at = ?4, prefix = ?5
             WHERE id = ?6
             "#,
             params![
-                profile.title,
-                profile.root_folder,
+                project.title,
+                project.root_folder,
                 ignore_json,
                 // REMOVED: allowed_json,
                 now,
                 prefix_val, // Update prefix
-                profile.id
+                project.id
             ],
         );
          match result {
              Ok(rows_affected) => {
                  if rows_affected == 0 {
-                     Err(format!("Failed to update profile: ID {} not found.", profile.id))
+                     Err(format!("Failed to update project: ID {} not found.", project.id))
                  } else {
-                     Ok(profile.id) // Return the existing ID
+                     Ok(project.id) // Return the existing ID
                  }
              },
-             Err(e) => Err(format!("Failed to update profile ID {}: {}", profile.id, e)),
+             Err(e) => Err(format!("Failed to update project ID {}: {}", project.id, e)),
          }
     }
 }
 
 #[command]
-pub fn delete_code_context_builder_profile(
+pub fn delete_code_context_builder_project(
     state: State<AppState>,
-    profile_id: i32,
+    project_id: i32,
 ) -> Result<(), String> {
     let conn = state.conn.lock().map_err(|e| format!("DB lock failed for delete: {}", e))?;
 
     // Use the correct table name
     let rows_affected = conn.execute(
-            "DELETE FROM code_context_builder_profiles WHERE id = ?1",
-             params![profile_id]
+            "DELETE FROM code_context_builder_projects WHERE id = ?1",
+             params![project_id]
         )
-        .map_err(|e| format!("Failed to execute delete for profile ID {}: {}", profile_id, e))?;
+        .map_err(|e| format!("Failed to execute delete for project ID {}: {}", project_id, e))?;
 
     if rows_affected == 0 {
-         eprintln!("Warning: Attempted to delete profile ID {}, but it was not found.", profile_id);
+         eprintln!("Warning: Attempted to delete project ID {}, but it was not found.", project_id);
     } else {
-        println!("Successfully deleted profile ID: {}", profile_id);
+        println!("Successfully deleted project ID: {}", project_id);
         // Cache cleanup is handled separately during scan
     }
     Ok(())
@@ -163,31 +163,31 @@ pub fn delete_code_context_builder_profile(
 
 // --- Internal Helper Functions ---
 
-// Loads a single profile by ID (Not exposed as command, used internally by scanner)
+// Loads a single project by ID (Not exposed as command, used internally by scanner)
 // Adjusted to remove allowed_patterns
-pub fn load_profile_by_id(conn: &Connection, profile_id: i32) -> Result<Profile, String> {
+pub fn load_project_by_id(conn: &Connection, project_id: i32) -> Result<Project, String> {
      let mut stmt = conn
          .prepare(
               // UPDATED Table Name and removed allowed_patterns column
               r#"
               SELECT id, title, root_folder, ignore_patterns, updated_at, prefix
-              FROM code_context_builder_profiles
+              FROM code_context_builder_projects
               WHERE id = ?1
               "#,
           )
-          .map_err(|e| format!("Failed to prepare statement for profile ID {}: {}", profile_id, e))?;
+          .map_err(|e| format!("Failed to prepare statement for project ID {}: {}", project_id, e))?;
 
-      stmt.query_row(params![profile_id], map_row_to_profile)
+      stmt.query_row(params![project_id], map_row_to_project)
           .optional() // Use optional to handle not found case gracefully
-          .map_err(|e| format!("Failed to query profile ID {}: {}", profile_id, e))?
-          .ok_or_else(|| format!("Profile with ID {} not found.", profile_id)) // Convert None to Error
+          .map_err(|e| format!("Failed to query project ID {}: {}", project_id, e))?
+          .ok_or_else(|| format!("Project with ID {} not found.", project_id)) // Convert None to Error
 }
 
 // Rename logic placeholder (unchanged, still complex)
 #[allow(dead_code)]
-fn rename_profile_prefix(
+fn rename_project_prefix(
     _tx: &Transaction,
-    _profile_id: i32,
+    _project_id: i32,
     _old_prefix: &str,
     _new_prefix: &str,
 ) -> Result<(), String> {

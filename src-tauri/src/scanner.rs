@@ -3,7 +3,7 @@
 // Main scan command orchestration, progress emission, cache interaction.
 
 use crate::db::AppState;
-use crate::profiles; // To load profile details
+use crate::projects; // To load project details
 use crate::scan_cache::{self, CacheEntry}; // Use module prefix
 use crate::scan_state::{is_scan_cancelled, set_cancel_scan};
 use crate::types::FileNode;
@@ -77,13 +77,13 @@ pub fn read_multiple_file_contents(
 
 // --- Main Scan Command ---
 #[command(async)]
-pub async fn scan_code_context_builder_profile(
+pub async fn scan_code_context_builder_project(
     window: Window,
     _app_handle: AppHandle,
     state: State<'_, AppState>,
-    profile_id: i32,
+    project_id: i32,
 ) -> Result<FileNode, String> {
-    println!("[CMD] Starting scan_code_context_builder_profile for ID: {}", profile_id);
+    println!("[CMD] Starting scan_code_context_builder_project for ID: {}", project_id);
     set_cancel_scan(false); // Reset cancellation flag
     let conn_arc = state.conn.clone(); // Clone the Arc for the background thread
     let window_clone = window.clone();
@@ -91,7 +91,7 @@ pub async fn scan_code_context_builder_profile(
     // Spawn the potentially long-running scan operation onto a blocking thread
     let scan_result = tauri::async_runtime::spawn_blocking(move || {
         // --- Blocking Task ---
-        let result = do_actual_scan(&window_clone, conn_arc, profile_id); // Pass Arc Mutex
+        let result = do_actual_scan(&window_clone, conn_arc, project_id); // Pass Arc Mutex
 
         // Emit completion event based on the result
         match &result {
@@ -137,16 +137,16 @@ pub async fn scan_code_context_builder_profile(
 fn do_actual_scan(
     window: &Window,
     conn_arc: Arc<Mutex<rusqlite::Connection>>, // Accept the Arc Mutex
-    profile_id: i32,
+    project_id: i32,
 ) -> Result<FileNode, String> {
     // --- Acquire lock for initial reads ---
-    let profile;
+    let project;
     let mut cache_map;
     { // Scope for the initial lock guard
         let conn_lock = conn_arc.lock().map_err(|e| format!("Initial DB lock failed: {}", e))?;
-        // 1. Load Profile Details
-        println!("[SCANNER] Loading profile details for ID: {}", profile_id);
-        profile = profiles::load_profile_by_id(&conn_lock, profile_id)?;
+        // 1. Load Project Details
+        println!("[SCANNER] Loading project details for ID: {}", project_id);
+        project = projects::load_project_by_id(&conn_lock, project_id)?;
 
         // 2. Load Existing File Cache
         println!("[SCANNER] Loading cache entries...");
@@ -154,14 +154,14 @@ fn do_actual_scan(
         println!("[SCANNER] Loaded {} cache entries.", cache_map.len());
     } // Initial lock guard dropped here
 
-    let root_folder = profile.root_folder.ok_or_else(|| format!("Profile ID {} has no root folder set.", profile_id))?;
+    let root_folder = project.root_folder.ok_or_else(|| format!("Project ID {} has no root folder set.", project_id))?;
     let root_path = PathBuf::from(&root_folder);
     if !root_path.is_dir() {
         return Err(format!("Root folder is not a valid directory: {}", root_folder));
     }
     println!("[SCANNER] Root folder: {}", root_folder);
-    println!("[SCANNER] Ignore patterns: {:?}", profile.ignore_patterns);
-    // REMOVED Log: println!("[SCANNER] Allow patterns: {:?}", profile.allowed_patterns);
+    println!("[SCANNER] Ignore patterns: {:?}", project.ignore_patterns);
+    // REMOVED Log: println!("[SCANNER] Allow patterns: {:?}", project.allowed_patterns);
 
     // 3. Emit Initial Progress
     emit_progress_sync(window, &root_path, 0, 1, "Enumerating files...");
@@ -171,7 +171,7 @@ fn do_actual_scan(
     let mut all_potential_paths = Vec::new();
     gather_valid_items(
         &root_path,
-        &profile.ignore_patterns,
+        &project.ignore_patterns,
         &mut all_potential_paths,
         0,
     );
@@ -320,7 +320,7 @@ fn do_actual_scan(
         println!("[SCANNER]    Children Sample ({} total): [{}]", file_node.children.len(), child_sample);
     }
 
-    println!("[SCANNER] Scan finished successfully for profile ID: {}", profile_id);
+    println!("[SCANNER] Scan finished successfully for project ID: {}", project_id);
     Ok(file_node) // Return the final tree
 }
 

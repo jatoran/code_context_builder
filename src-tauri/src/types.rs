@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Profile {
+pub struct Project {
     #[serde(default)] // Good practice for IDs potentially missing in input JSON
     pub id: i32,
     pub title: String,

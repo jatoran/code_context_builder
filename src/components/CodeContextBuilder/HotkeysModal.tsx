@@ -36,7 +36,7 @@ const HotkeysModal: React.FC<HotkeysModalProps> = ({ isOpen, onClose }) => {
                 <div className="hotkeys-modal-body">
                     <ul>
                         <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> : Copy Aggregated Context</li>
-                        <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd> : Scan Current Profile</li>
+                        <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd> : Scan Current Project</li>
                         
                         <hr />
                         

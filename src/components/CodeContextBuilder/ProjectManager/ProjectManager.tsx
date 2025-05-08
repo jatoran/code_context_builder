@@ -1,23 +1,23 @@
 
-// src/components/CodeContextBuilder/ProfileManager/ProfileManager.tsx
+// src/components/CodeContextBuilder/ProjectManager/ProjectManager.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Profile } from '../../../types/profiles';
-import ProfileManagerForm from './ProfileManagerForm';
+import { Project } from '../../../types/projects';
+import ProjectManagerForm from './ProjectManagerForm';
 
-interface ProfileManagerProps {
-  profiles: Profile[];
-  selectedProfileId: number;
-  onProfileSelect: (id: number) => void;
-  profileTitle: string;
-  setProfileTitle: (value: string) => void;
+interface ProjectManagerProps {
+  projects: Project[];
+  selectedProjectId: number;
+  onProjectSelect: (id: number) => void;
+  projectTitle: string;
+  setProjectTitle: (value: string) => void;
   rootFolder: string;
   setRootFolder: (value: string) => void;
   ignoreText: string;
   setIgnoreText: (value: string) => void;
-  onSaveProfile: () => Promise<'saved' | 'error' | 'no_profile'>; 
-  onCreateProfile: () => void;
-  onDeleteProfile: () => void;
-  onScanProfile: () => void;
+  onSaveProject: () => Promise<'saved' | 'error' | 'no_project'>; 
+  onCreateProject: () => void;
+  onDeleteProject: () => void;
+  onScanProject: () => void;
   isScanning: boolean;
   outOfDateFileCount: number; // New prop for stale file indication
 }
@@ -32,24 +32,24 @@ function safeGetItem<T>(key: string, defaultValue: T): T {
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 
-const ProfileManager: React.FC<ProfileManagerProps> = ({
-  profiles,
-  selectedProfileId,
-  onProfileSelect,
-  profileTitle,
-  setProfileTitle,
+const ProjectManager: React.FC<ProjectManagerProps> = ({
+  projects,
+  selectedProjectId,
+  onProjectSelect,
+  projectTitle,
+  setProjectTitle,
   rootFolder,
   setRootFolder,
   ignoreText,
   setIgnoreText,
-  onSaveProfile,
-  onCreateProfile,
-  onDeleteProfile,
-  onScanProfile,
+  onSaveProject,
+  onCreateProject,
+  onDeleteProject,
+  onScanProject,
   isScanning,
   outOfDateFileCount,
 }) => {
-  const [showSettings, setShowSettings] = useState<boolean>(() => safeGetItem('ccb_showProfileSettings', true));
+  const [showSettings, setShowSettings] = useState<boolean>(() => safeGetItem('ccb_showProjectSettings', true));
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const saveTimeoutRef = useRef<number | null>(null);
   const isMountedRef = useRef(true); // For mounted check
@@ -66,14 +66,14 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
 
 
   useEffect(() => {
-      safeSetItem('ccb_showProfileSettings', showSettings);
+      safeSetItem('ccb_showProjectSettings', showSettings);
   }, [showSettings]);
 
-  const hasProfiles = profiles.length > 0;
-  const profileSelected = selectedProfileId > 0;
+  const hasProjects = projects.length > 0;
+  const projectSelected = selectedProjectId > 0;
 
   const triggerAutoSave = useCallback(() => {
-    if (!profileSelected) return;
+    if (!projectSelected) return;
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -81,7 +81,7 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
     if (isMountedRef.current) setSaveStatus('saving');
 
     saveTimeoutRef.current = window.setTimeout(async () => {
-      const result = await onSaveProfile();
+      const result = await onSaveProject();
       if (!isMountedRef.current) return;
 
       if (result === 'saved') {
@@ -92,14 +92,14 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
         setTimeout(() => { if (isMountedRef.current) setSaveStatus('idle'); }, 3000);
       }
     }, 750); 
-  }, [onSaveProfile, profileSelected]);
+  }, [onSaveProject, projectSelected]);
 
   useEffect(() => {
-    if (profileSelected && !isScanning) { 
+    if (projectSelected && !isScanning) { 
       triggerAutoSave();
     }
     // Cleanup for this effect is handled by the main unmount effect for saveTimeoutRef
-  }, [profileTitle, rootFolder, ignoreText, profileSelected, isScanning, triggerAutoSave]);
+  }, [projectTitle, rootFolder, ignoreText, projectSelected, isScanning, triggerAutoSave]);
 
 
   const getSaveStatusMessage = () => {
@@ -111,13 +111,13 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
     }
   };
 
-  const scanButtonTitle = !profileSelected
-    ? "Select a profile first"
+  const scanButtonTitle = !projectSelected
+    ? "Select a project first"
     : isScanning
     ? "Scan in progress..."
     : outOfDateFileCount > 0
     ? `Rescan recommended (${outOfDateFileCount} file${outOfDateFileCount === 1 ? '' : 's'} changed)`
-    : "Scan files for selected profile";
+    : "Scan files for selected project";
 
   const scanButtonIcon = isScanning 
     ? '⏳' 
@@ -134,23 +134,23 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
   }
 
   return (
-    <div className="profile-manager">
+    <div className="project-manager">
       <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-        <h3>Profile Manager</h3>
-        {profileSelected && saveStatus !== 'idle' && (
+        <h3>Project Manager</h3>
+        {projectSelected && saveStatus !== 'idle' && (
             <span className={`save-status ${saveStatus} visible`}>{getSaveStatusMessage()}</span>
         )}
       </div>
 
       <div className="pm-row-select">
         <select
-          value={selectedProfileId}
-          onChange={(e) => onProfileSelect(Number(e.target.value))}
-          disabled={!hasProfiles || isScanning}
-          title={!hasProfiles ? "No profiles available" : "Select a profile"}
+          value={selectedProjectId}
+          onChange={(e) => onProjectSelect(Number(e.target.value))}
+          disabled={!hasProjects || isScanning}
+          title={!hasProjects ? "No projects available" : "Select a project"}
         >
-          <option value={0} disabled={hasProfiles}>-- Select Profile --</option>
-          {profiles.map((p) => (
+          <option value={0} disabled={hasProjects}>-- Select Project --</option>
+          {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.title}
             </option>
@@ -160,19 +160,19 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
 
       <div className="pm-row-buttons">
         <div className="pm-buttons-group-left">
-          <button onClick={onCreateProfile} disabled={isScanning} title="Create a new profile">➕</button>
-          <button onClick={onDeleteProfile} disabled={!profileSelected || isScanning} title="Delete the selected profile">🗑️</button>
+          <button onClick={onCreateProject} disabled={isScanning} title="Create a new project">➕</button>
+          <button onClick={onDeleteProject} disabled={!projectSelected || isScanning} title="Delete the selected project">🗑️</button>
           <button 
               onClick={() => setShowSettings(!showSettings)} 
-              disabled={isScanning || !profileSelected} 
-              title={showSettings ? "Hide Profile Settings" : "Show Profile Settings"}
+              disabled={isScanning || !projectSelected} 
+              title={showSettings ? "Hide Project Settings" : "Show Project Settings"}
           >
             {showSettings ? '⚙️' : '⚙️'} 
           </button>
         </div>
         <button
-           onClick={onScanProfile}
-           disabled={!profileSelected || isScanning}
+           onClick={onScanProject}
+           disabled={!projectSelected || isScanning}
            title={scanButtonTitle}
            className={scanButtonClasses.join(' ')}
         >
@@ -180,23 +180,23 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
         </button>
       </div>
 
-      {showSettings && profileSelected && (
-        <ProfileManagerForm
-          profileTitle={profileTitle}
-          setProfileTitle={setProfileTitle}
+      {showSettings && projectSelected && (
+        <ProjectManagerForm
+          projectTitle={projectTitle}
+          setProjectTitle={setProjectTitle}
           rootFolder={rootFolder}
           setRootFolder={setRootFolder}
           ignoreText={ignoreText}
           setIgnoreText={setIgnoreText}
         />
       )}
-       {showSettings && !profileSelected && (
+       {showSettings && !projectSelected && (
          <p style={{marginTop: '1em', fontStyle: 'italic', color: '#aaa'}}>
-             Select or create a profile to view and edit its settings.
+             Select or create a project to view and edit its settings.
          </p>
        )}
     </div>
   );
 };
 
-export default ProfileManager;
+export default ProjectManager;

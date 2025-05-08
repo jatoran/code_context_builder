@@ -103,7 +103,7 @@ html, body, #root {
     overflow: hidden;
 }
 
-/* Left Panel (Profile Manager + Aggregator) */
+/* Left Panel (Project Manager + Aggregator) */
 .left-panel {
   width: 380px; /* Adjust as needed */
   min-width: 300px; /* Ensure it's usable when not fully collapsed */
@@ -128,9 +128,9 @@ html, body, #root {
     padding: 1em;
     box-sizing: border-box;
 }
-.left-panel-profile-manager {
-    /* ProfileManager will take its natural height or a defined flex basis */
-    flex-shrink: 0; /* Don't shrink ProfileManager area much */
+.left-panel-project-manager {
+    /* ProjectManager will take its natural height or a defined flex basis */
+    flex-shrink: 0; /* Don't shrink ProjectManager area much */
     border-bottom: 1px solid var(--border-color); /* Separator */
     overflow-y: auto; /* Scroll if content too tall */
     max-height: 50%; /* Example: allow PM to take up to 50% */
@@ -282,19 +282,19 @@ label {
 
 
 /* --------------------------------------------------------------------------
-   Profile Manager (in Left Panel)
+   Project Manager (in Left Panel)
    -------------------------------------------------------------------------- */
-.profile-manager {
+.project-manager {
   display: flex;
   flex-direction: column;
   gap: 0.8em; 
 }
-.profile-manager h3 {
+.project-manager h3 {
     margin-bottom: 0.5em; 
     font-size: 1.1em; 
 }
 
-/* New layout for Profile Manager controls */
+/* New layout for Project Manager controls */
 .pm-row-select {
   width: 100%;
   margin-bottom: 0.5em; /* Space between dropdown and button row */
@@ -318,33 +318,33 @@ label {
   align-items: center;
 }
 
-/* General button styling within ProfileManager (was previously .profile-controls button) */
-.profile-manager button {
+/* General button styling within ProjectManager (was previously .project-controls button) */
+.project-manager button {
   padding: 0.4rem 0.6rem; 
   font-size: 1em; /* For icons */
   margin: 0; /* Remove default button margin */
   line-height: 1; /* Better icon alignment */
 }
 
-/* Specific styles for Scan button in ProfileManager */
-.profile-manager button.scan-btn-stale {
+/* Specific styles for Scan button in ProjectManager */
+.project-manager button.scan-btn-stale {
     border-color: var(--danger-color);
     color: var(--danger-color);
 }
-.profile-manager button.scan-btn-stale:hover {
+.project-manager button.scan-btn-stale:hover {
     background-color: var(--danger-color);
     border-color: var(--danger-color);
     color: var(--text-color); 
 }
-.profile-manager button.scan-btn-scanning {
+.project-manager button.scan-btn-scanning {
   animation: pulseBorder 1.5s infinite ease-in-out;
   opacity: 1; 
   cursor: not-allowed; 
 }
 
 
-/* Profile Form Styling (using PDK classes/structure) */
-.profile-form {
+/* Project Form Styling (using PDK classes/structure) */
+.project-form {
   margin-top: 0.8em;
   border: 1px solid var(--border-color);
   padding: 0.8em; /* Reduced padding */
@@ -354,30 +354,30 @@ label {
   flex-direction: column;
   gap: 0.6em; /* Reduced gap */
 }
-.profile-form .form-field { /* New wrapper for label + input */
+.project-form .form-field { /* New wrapper for label + input */
     display: flex;
     flex-direction: column; /* Label above input */
     gap: 0.2em;
 }
-.profile-form label {
+.project-form label {
     font-size: 0.85em;
     margin-bottom: 0; /* No extra margin */
     color: var(--label-text-color);
 }
-.profile-form input[type="text"],
-.profile-form textarea {
+.project-form input[type="text"],
+.project-form textarea {
     width: 100%; /* Full width */
     padding: 0.4rem; /* Smaller padding */
     font-size: 0.9em;
 }
-.profile-form .input-with-button { /* For root folder + browse */
+.project-form .input-with-button { /* For root folder + browse */
     display: flex;
     gap: 0.3em;
 }
-.profile-form .input-with-button input {
+.project-form .input-with-button input {
     flex-grow: 1;
 }
-.profile-form button.browse-button {
+.project-form button.browse-button {
      padding: 0.4rem; /* Match input height */
      font-size: 1em;
      flex-shrink: 0;
@@ -387,12 +387,12 @@ label {
      border-color: var(--border-color);
      min-width: auto;
  }
-.profile-form button.browse-button:hover {
+.project-form button.browse-button:hover {
     background-color: var(--accent-color);
     border-color: var(--accent-color);
 }
 
-/* Save status display in ProfileManager */
+/* Save status display in ProjectManager */
 .save-status {
     font-size: 0.8em;
     padding: 0.2em 0.5em;
@@ -826,18 +826,18 @@ label {
   button.delete-btn:hover { background-color: #b00; border-color: #b00; }
   button:disabled { background-color: #e0e0e0; border-color: #d0d0d0; color: #999; }
   
-  .profile-manager button.scan-btn-stale {
+  .project-manager button.scan-btn-stale {
       border-color: var(--danger-color);
       color: var(--danger-color);
   }
-  .profile-manager button.scan-btn-stale:hover {
+  .project-manager button.scan-btn-stale:hover {
       background-color: var(--danger-color);
       border-color: var(--danger-color);
       color: var(--bg-color); /* Ensure contrast on hover for light theme */
   }
 
   .left-panel { border-right-color: var(--border-color); background-color: var(--left-panel-bg-color); }
-  .left-panel-profile-manager { border-bottom-color: var(--border-color); }
+  .left-panel-project-manager { border-bottom-color: var(--border-color); }
   .file-tree-main-content { background-color: var(--background-color); }
   .file-tree-header { border-bottom-color: var(--border-secondary-color); }
   .hotkeys-help-btn { color: var(--label-text-color); }
@@ -845,7 +845,7 @@ label {
 
 
   .aggregator-content { background-color: var(--input-background-color); border-color: var(--border-color); color: var(--text-color); }
-  .profile-form { border-color: var(--border-color); background-color: var(--card-bg-color2); }
+  .project-form { border-color: var(--border-color); background-color: var(--card-bg-color2); }
   .search-container { border-bottom-color: var(--border-secondary-color); }
   .aggregator-header { border-bottom-color: var(--border-secondary-color); }
   .status-bar { background-color: #f0f0f0; border-top-color: var(--border-color); color: #555; }

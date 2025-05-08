@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import "./App.css";
-import ProfileManager from "./components/CodeContextBuilder/ProfileManager/ProfileManager";
+import ProjectManager from "./components/CodeContextBuilder/ProjectManager/ProjectManager";
 import FileTree, { FileTreeRefHandles } from "./components/CodeContextBuilder/FileTree/FileTree";
 import Aggregator from "./components/CodeContextBuilder/Aggregator/Aggregator";
 import StatusBar from "./components/CodeContextBuilder/StatusBar";
 import FileViewerModal from "./components/CodeContextBuilder/FileViewerModal";
 import HotkeysModal from "./components/CodeContextBuilder/HotkeysModal";
-import { Profile } from "./types/profiles";
+import { Project } from "./types/projects";
 import { FileNode } from "./types/scanner";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
@@ -120,8 +120,8 @@ const calculateTreeStats = (node: FileNode | null): TreeStats => {
 function App() {
     const isMountedRef = useRef(true);
 
-    const [profiles, setProfiles] = useState<Profile[]>([]);
-    const [selectedProfileId, setSelectedProfileId] = useState<number>(0); 
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [selectedProjectId, setSelectedProjectId] = useState<number>(0); 
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -150,9 +150,9 @@ function App() {
     const fileTreeRef = useRef<FileTreeRefHandles>(null); 
 
 
-    const prevProfileId = useRef<number | null>(null); 
+    const prevProjectId = useRef<number | null>(null); 
 
-    const selectedProfile = useMemo(() => profiles.find(p => p.id === selectedProfileId), [profiles, selectedProfileId]);
+    const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
 
     // --- Mounted Ref Effect ---
     useEffect(() => {
@@ -273,57 +273,57 @@ function App() {
 
 
     // --- File Monitoring Control ---
-    const [isMonitoringProfile, setIsMonitoringProfile] = useState<number | null>(null);
+    const [isMonitoringProject, setIsMonitoringProject] = useState<number | null>(null);
 
     const stopFileMonitoring = useCallback(async () => {
-        if (isMonitoringProfile !== null) { 
+        if (isMonitoringProject !== null) { 
             try {
-                await invoke("stop_monitoring_profile_cmd");
+                await invoke("stop_monitoring_project_cmd");
                 if (isMountedRef.current) {
-                    setIsMonitoringProfile(null);
+                    setIsMonitoringProject(null);
                     setOutOfDateFilePaths(new Set()); 
                 }
             } catch (err) {
-                // console.error("[App Monitor] Failed to stop file monitoring for profile " + isMonitoringProfile + ":", err);
+                // console.error("[App Monitor] Failed to stop file monitoring for project " + isMonitoringProject + ":", err);
             }
         }
-    }, [isMonitoringProfile]); 
+    }, [isMonitoringProject]); 
 
-    const startFileMonitoring = useCallback(async (profileId: number, currentTreeData: FileNode | null) => {
+    const startFileMonitoring = useCallback(async (projectId: number, currentTreeData: FileNode | null) => {
         await stopFileMonitoring(); 
         
         if (!isMountedRef.current) return;
 
-        if (profileId > 0 && currentTreeData) {
+        if (projectId > 0 && currentTreeData) {
             const filesToMonitorMap = getMonitorableFilesFromTree(currentTreeData);
             if (Object.keys(filesToMonitorMap).length > 0) {
                 try {
-                    const payload = { profileId, filesToMonitor: filesToMonitorMap }; 
-                    await invoke("start_monitoring_profile_cmd", payload);
+                    const payload = { projectId, filesToMonitor: filesToMonitorMap }; 
+                    await invoke("start_monitoring_project_cmd", payload);
                     if (isMountedRef.current) {
-                        setIsMonitoringProfile(profileId);
+                        setIsMonitoringProject(projectId);
                         setOutOfDateFilePaths(new Set()); 
                     }
                 } catch (err) {
-                    // console.error("[App Monitor] Failed to start file monitoring for profile " + profileId + ":", err);
-                    if (isMountedRef.current) setIsMonitoringProfile(null); 
+                    // console.error("[App Monitor] Failed to start file monitoring for project " + projectId + ":", err);
+                    if (isMountedRef.current) setIsMonitoringProject(null); 
                 }
             } else {
-                if (isMountedRef.current) setIsMonitoringProfile(null); 
+                if (isMountedRef.current) setIsMonitoringProject(null); 
             }
         } else {
-            if (isMountedRef.current) setIsMonitoringProfile(null); 
+            if (isMountedRef.current) setIsMonitoringProject(null); 
         }
     }, [stopFileMonitoring]);
 
     
     useEffect(() => {
-        if (selectedProfileId > 0 && treeData) {
-            startFileMonitoring(selectedProfileId, treeData);
+        if (selectedProjectId > 0 && treeData) {
+            startFileMonitoring(selectedProjectId, treeData);
         } else {
             stopFileMonitoring();
         }
-    }, [selectedProfileId, treeData, startFileMonitoring, stopFileMonitoring]);
+    }, [selectedProjectId, treeData, startFileMonitoring, stopFileMonitoring]);
     
     useEffect(() => {
         const localIsMountedRef = { current: true };
@@ -348,40 +348,40 @@ function App() {
     // --- End File Monitoring ---
 
 
-    const loadProfiles = useCallback(async (selectId?: number) => {
+    const loadProjects = useCallback(async (selectId?: number) => {
         if (isMountedRef.current) setIsLoading(true);
         if (isMountedRef.current) setError(null);
         try {
             if (typeof invoke !== 'function') {
                 throw new Error("Tauri API 'invoke' not ready.");
             }
-            const loadedProfiles = await invoke<Profile[]>("list_code_context_builder_profiles");
+            const loadedProjects = await invoke<Project[]>("list_code_context_builder_projects");
             
             if (!isMountedRef.current) return;
 
-            setProfiles(loadedProfiles);
+            setProjects(loadedProjects);
             
-            let profileToSelect = 0;
-            const lastSelectedIdStr = localStorage.getItem('ccb_lastSelectedProfileId');
+            let projectToSelect = 0;
+            const lastSelectedIdStr = localStorage.getItem('ccb_lastSelectedProjectId');
             const lastSelectedIdNumFromStorage = lastSelectedIdStr ? parseInt(lastSelectedIdStr, 10) : 0;
 
-            if (selectId && loadedProfiles.some(p => p.id === selectId)) {
-                profileToSelect = selectId;
-            } else if (lastSelectedIdNumFromStorage > 0 && loadedProfiles.some(p => p.id === lastSelectedIdNumFromStorage)) {
-                profileToSelect = lastSelectedIdNumFromStorage;
-            } else if (loadedProfiles.length > 0) {
-                profileToSelect = loadedProfiles[0].id;
+            if (selectId && loadedProjects.some(p => p.id === selectId)) {
+                projectToSelect = selectId;
+            } else if (lastSelectedIdNumFromStorage > 0 && loadedProjects.some(p => p.id === lastSelectedIdNumFromStorage)) {
+                projectToSelect = lastSelectedIdNumFromStorage;
+            } else if (loadedProjects.length > 0) {
+                projectToSelect = loadedProjects[0].id;
             }
-            setSelectedProfileId(profileToSelect);
+            setSelectedProjectId(projectToSelect);
 
         } catch (err) {
-            console.error("[APP] Failed to load profiles:", err);
+            console.error("[APP] Failed to load projects:", err);
             if (isMountedRef.current) {
-                setError(`Failed to load profiles: ${err instanceof Error ? err.message : String(err)}`);
-                setProfiles([]);
-                setSelectedProfileId(0);
+                setError(`Failed to load projects: ${err instanceof Error ? err.message : String(err)}`);
+                setProjects([]);
+                setSelectedProjectId(0);
             }
-            localStorage.removeItem('ccb_lastSelectedProfileId'); 
+            localStorage.removeItem('ccb_lastSelectedProjectId'); 
         } finally {
             if (isMountedRef.current) setIsLoading(false);
         }
@@ -389,47 +389,47 @@ function App() {
 
     useEffect(() => {
         const localIsMountedRef = { current: true };
-        loadProfiles(undefined).catch(loadErr => {
+        loadProjects(undefined).catch(loadErr => {
             if(localIsMountedRef.current && isMountedRef.current) { // Check both
-                console.error("Error during initial profile load:", loadErr);
+                console.error("Error during initial project load:", loadErr);
             }
         });
         return () => { localIsMountedRef.current = false; };
-    }, [loadProfiles]); 
+    }, [loadProjects]); 
 
     useEffect(() => {
-        const profile = profiles.find(p => p.id === selectedProfileId);
+        const project = projects.find(p => p.id === selectedProjectId);
 
-        // This effect primarily deals with synchronous state updates based on selectedProfileId.
+        // This effect primarily deals with synchronous state updates based on selectedProjectId.
         // No direct async operations leading to state updates here that need `isMountedRef`.
-        if (prevProfileId.current !== selectedProfileId) { 
-            setEditableTitle(profile?.title || "");
-            setEditableRootFolder(profile?.root_folder || "");
-            setEditableIgnorePatterns(profile?.ignore_patterns?.join("\n") || "");
+        if (prevProjectId.current !== selectedProjectId) { 
+            setEditableTitle(project?.title || "");
+            setEditableRootFolder(project?.root_folder || "");
+            setEditableIgnorePatterns(project?.ignore_patterns?.join("\n") || "");
 
-            if (selectedProfileId > 0) {
-                localStorage.setItem('ccb_lastSelectedProfileId', selectedProfileId.toString());
+            if (selectedProjectId > 0) {
+                localStorage.setItem('ccb_lastSelectedProjectId', selectedProjectId.toString());
                 
-                const storedTreeJson = localStorage.getItem(`ccb_treeData_${selectedProfileId}`);
+                const storedTreeJson = localStorage.getItem(`ccb_treeData_${selectedProjectId}`);
                 let loadedTree: FileNode | null = null;
                 if (storedTreeJson) {
                     try {
                         loadedTree = JSON.parse(storedTreeJson);
                     } catch (e) {
-                        console.warn(`[APP MainEffect] Failed to parse stored tree data for profile ${selectedProfileId}:`, e);
-                        localStorage.removeItem(`ccb_treeData_${selectedProfileId}`);
+                        console.warn(`[APP MainEffect] Failed to parse stored tree data for project ${selectedProjectId}:`, e);
+                        localStorage.removeItem(`ccb_treeData_${selectedProjectId}`);
                     }
                 }
                 setTreeData(loadedTree);
 
-                const storedSelected = localStorage.getItem(`ccb_selectedPaths_${selectedProfileId}`);
+                const storedSelected = localStorage.getItem(`ccb_selectedPaths_${selectedProjectId}`);
                 setSelectedPaths(storedSelected ? new Set(JSON.parse(storedSelected)) : new Set());
 
-                const storedExpanded = localStorage.getItem(`ccb_expandedPaths_${selectedProfileId}`);
+                const storedExpanded = localStorage.getItem(`ccb_expandedPaths_${selectedProjectId}`);
                 setExpandedPaths(storedExpanded ? new Set(JSON.parse(storedExpanded)) : new Set());
             } else {
-                if (prevProfileId.current !== null && prevProfileId.current > 0) {
-                    localStorage.removeItem('ccb_lastSelectedProfileId');
+                if (prevProjectId.current !== null && prevProjectId.current > 0) {
+                    localStorage.removeItem('ccb_lastSelectedProjectId');
                 }
                  setTreeData(null); 
                  setSelectedPaths(new Set());
@@ -439,21 +439,21 @@ function App() {
             setViewingFilePath(null);
         }
         
-        prevProfileId.current = selectedProfileId;
+        prevProjectId.current = selectedProjectId;
 
-    }, [selectedProfileId, profiles]); 
-
-    useEffect(() => {
-        if (selectedProfileId > 0) {
-            localStorage.setItem(`ccb_selectedPaths_${selectedProfileId}`, JSON.stringify(Array.from(selectedPaths)));
-        }
-    }, [selectedPaths, selectedProfileId]);
+    }, [selectedProjectId, projects]); 
 
     useEffect(() => {
-        if (selectedProfileId > 0) {
-            localStorage.setItem(`ccb_expandedPaths_${selectedProfileId}`, JSON.stringify(Array.from(expandedPaths)));
+        if (selectedProjectId > 0) {
+            localStorage.setItem(`ccb_selectedPaths_${selectedProjectId}`, JSON.stringify(Array.from(selectedPaths)));
         }
-    }, [expandedPaths, selectedProfileId]);
+    }, [selectedPaths, selectedProjectId]);
+
+    useEffect(() => {
+        if (selectedProjectId > 0) {
+            localStorage.setItem(`ccb_expandedPaths_${selectedProjectId}`, JSON.stringify(Array.from(expandedPaths)));
+        }
+    }, [expandedPaths, selectedProjectId]);
 
     useEffect(() => {
         try { localStorage.setItem('ccb_isLeftPanelCollapsed', String(isLeftPanelCollapsed)); } catch {}
@@ -530,32 +530,32 @@ function App() {
     }, [isScanning, scanProgressPct, currentScanPath]);
 
 
-    // --- Profile CRUD Handlers ---
-    const handleSaveCurrentProfile = useCallback(async () => {
-        if (!selectedProfileId || typeof invoke !== 'function') { 
-            if (isMountedRef.current) setError("Cannot save: No profile selected or API not ready.");
-            return "no_profile"; 
+    // --- Project CRUD Handlers ---
+    const handleSaveCurrentProject = useCallback(async () => {
+        if (!selectedProjectId || typeof invoke !== 'function') { 
+            if (isMountedRef.current) setError("Cannot save: No project selected or API not ready.");
+            return "no_project"; 
         }
-        const currentTitle = editableTitle.trim() || "Untitled Profile";
+        const currentTitle = editableTitle.trim() || "Untitled Project";
         const currentRootFolder = editableRootFolder.trim() || null;
         const currentIgnoreArr = editableIgnorePatterns.split('\n').map(s => s.trim()).filter(Boolean);
 
-        const profileToSave: Omit<Profile, 'updated_at'> & { id: number } = {
-            id: selectedProfileId,
+        const projectToSave: Omit<Project, 'updated_at'> & { id: number } = {
+            id: selectedProjectId,
             title: currentTitle,
             root_folder: currentRootFolder,
             ignore_patterns: currentIgnoreArr,
         };
         try {
-            await invoke("save_code_context_builder_profile", { profile: profileToSave });
+            await invoke("save_code_context_builder_project", { project: projectToSave });
             if (!isMountedRef.current) return "error"; // Or some other status indicating unmounted
 
-            setProfiles(prevProfiles => { 
+            setProjects(prevProjects => { 
                 const newUpdatedAt = new Date().toISOString();
-                return prevProfiles.map(p => {
-                    if (p.id === selectedProfileId) {
+                return prevProjects.map(p => {
+                    if (p.id === selectedProjectId) {
                         if(p.root_folder !== currentRootFolder) {
-                            console.log("[App SaveProfile] Root folder changed. Current tree data may be invalid for monitoring.");
+                            console.log("[App SaveProject] Root folder changed. Current tree data may be invalid for monitoring.");
                         }
                         return {
                             ...p,
@@ -574,57 +574,57 @@ function App() {
             if (isMountedRef.current) setError(`Save failed: ${err instanceof Error ? err.message : String(err)}`);
             return "error"; 
         }
-    }, [selectedProfileId, editableTitle, editableRootFolder, editableIgnorePatterns]);
+    }, [selectedProjectId, editableTitle, editableRootFolder, editableIgnorePatterns]);
 
-    const handleCreateNewProfile = useCallback(async () => {
+    const handleCreateNewProject = useCallback(async () => {
         if (typeof invoke !== 'function') {
             if (isMountedRef.current) setError("Cannot create: API not ready."); 
             return; 
         }
-        const newTitle = prompt("Enter new profile title:");
+        const newTitle = prompt("Enter new project title:");
         if (newTitle && newTitle.trim()) {
              const DEFAULT_IGNORE = [ "*.test.*", "*.spec.*", "node_modules", ".git", "/venv/", ".godot", "/public/", ".next", ".vscode", ".venv", "pgsql", "*__pycache__", ".gitignore", "*.ps1", "*.vbs", ".python-version", "uv.lock", "pyproject.toml", "/dist/", "/assets/", ".exe", "pycache", ".csv", ".env", "*package-lock.json", "*.code-workspace", "/target/","/gen/"];
-            const newProfileData: Partial<Omit<Profile, 'id' | 'updated_at'>> = { 
+            const newProjectData: Partial<Omit<Project, 'id' | 'updated_at'>> = { 
                 title: newTitle.trim(),
                 root_folder: null,
                 ignore_patterns: DEFAULT_IGNORE
             };
             try {
-                const newId = await invoke<number>("save_code_context_builder_profile", { profile: newProfileData });
-                if (isMountedRef.current) await loadProfiles(newId);
+                const newId = await invoke<number>("save_code_context_builder_project", { project: newProjectData });
+                if (isMountedRef.current) await loadProjects(newId);
             }
             catch (err) { 
                 if (isMountedRef.current) setError(`Create failed: ${err instanceof Error ? err.message : String(err)}`); 
             }
         }
-    }, [loadProfiles]); 
+    }, [loadProjects]); 
 
-    const handleDeleteCurrentProfile = useCallback(async () => {
+    const handleDeleteCurrentProject = useCallback(async () => {
         if (typeof invoke !== 'function') { 
             if (isMountedRef.current) setError("Cannot delete: API not ready."); 
             return; 
         }
-        const profileToDelete = profiles.find(p => p.id === selectedProfileId);
-        if (!selectedProfileId || !profileToDelete || !confirm(`Delete profile "${profileToDelete.title}"? This cannot be undone.`)) { return; }
+        const projectToDelete = projects.find(p => p.id === selectedProjectId);
+        if (!selectedProjectId || !projectToDelete || !confirm(`Delete project "${projectToDelete.title}"? This cannot be undone.`)) { return; }
         try {
-            await invoke("delete_code_context_builder_profile", { profileId: selectedProfileId });
-            localStorage.removeItem(`ccb_treeData_${selectedProfileId}`);
-            localStorage.removeItem(`ccb_selectedPaths_${selectedProfileId}`);
-            localStorage.removeItem(`ccb_expandedPaths_${selectedProfileId}`);
-            if (isMountedRef.current) await loadProfiles(); 
+            await invoke("delete_code_context_builder_project", { projectId: selectedProjectId });
+            localStorage.removeItem(`ccb_treeData_${selectedProjectId}`);
+            localStorage.removeItem(`ccb_selectedPaths_${selectedProjectId}`);
+            localStorage.removeItem(`ccb_expandedPaths_${selectedProjectId}`);
+            if (isMountedRef.current) await loadProjects(); 
         }
         catch (err) { 
             if (isMountedRef.current) setError(`Delete failed: ${err instanceof Error ? err.message : String(err)}`); 
         }
-    }, [selectedProfileId, profiles, loadProfiles]); 
+    }, [selectedProjectId, projects, loadProjects]); 
 
     // --- Scan Handlers ---
-    const handleScanProfile = useCallback(async () => {
-        if (!selectedProfileId || isScanning || typeof invoke !== 'function') {
-            if (isMountedRef.current) setError("Cannot scan: No profile selected, scan in progress, or API not ready.");
+    const handleScanProject = useCallback(async () => {
+        if (!selectedProjectId || isScanning || typeof invoke !== 'function') {
+            if (isMountedRef.current) setError("Cannot scan: No project selected, scan in progress, or API not ready.");
             return;
         }
-        if(isMonitoringProfile === selectedProfileId) {
+        if(isMonitoringProject === selectedProjectId) {
             await stopFileMonitoring(); // stopFileMonitoring has its own mounted checks for its state setters
        }
 
@@ -637,19 +637,19 @@ function App() {
        setOutOfDateFilePaths(new Set()); 
 
        try {
-           const result = await invoke<FileNode>("scan_code_context_builder_profile", { profileId: selectedProfileId });
+           const result = await invoke<FileNode>("scan_code_context_builder_project", { projectId: selectedProjectId });
            if (!isMountedRef.current) return;
            setTreeData(result); 
-           localStorage.setItem(`ccb_treeData_${selectedProfileId}`, JSON.stringify(result));
-           setProfiles(prev => prev.map(p => p.id === selectedProfileId ? {...p, updated_at: new Date().toISOString()} : p));
+           localStorage.setItem(`ccb_treeData_${selectedProjectId}`, JSON.stringify(result));
+           setProjects(prev => prev.map(p => p.id === selectedProjectId ? {...p, updated_at: new Date().toISOString()} : p));
         } catch (err) {
             console.error("[APP] Scan invocation failed:", err);
             if (!isMountedRef.current) return;
             setError(`Scan failed: ${err instanceof Error ? err.message : String(err)}`);
             setTreeData(null); 
-            localStorage.removeItem(`ccb_treeData_${selectedProfileId}`);
+            localStorage.removeItem(`ccb_treeData_${selectedProjectId}`);
         }
-    }, [selectedProfileId, isScanning, stopFileMonitoring, isMonitoringProfile ]);
+    }, [selectedProjectId, isScanning, stopFileMonitoring, isMonitoringProject ]);
 
     const handleCancelScan = useCallback(async () => {
         if (!isScanning || typeof invoke !== 'function') return;
@@ -724,8 +724,8 @@ function App() {
             window.dispatchEvent(new CustomEvent('hotkey-copy-aggregated'));
         } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'R') {
             event.preventDefault();
-            if (selectedProfileId > 0 && !isScanning) {
-                handleScanProfile(); // This is async and has mounted checks
+            if (selectedProjectId > 0 && !isScanning) {
+                handleScanProject(); // This is async and has mounted checks
             }
         } else if (event.ctrlKey && event.key.toLowerCase() === 'a' && !isInputFocused) {
             event.preventDefault();
@@ -743,7 +743,7 @@ function App() {
             event.preventDefault();
             if (isMountedRef.current) setSelectedPaths(new Set());
         }
-    }, [treeData, selectedProfileId, isScanning, handleScanProfile, fileTreeRef]); 
+    }, [treeData, selectedProjectId, isScanning, handleScanProject, fileTreeRef]); 
 
     useEffect(() => {
         window.addEventListener('keydown', handleGlobalKeyDown);
@@ -780,7 +780,7 @@ function App() {
             {isScanning && (
                 <div className="scan-overlay">
                     <div className="scan-indicator">
-                        <h3>Scanning Profile...</h3>
+                        <h3>Scanning Project...</h3>
                         <progress value={scanProgressPct} max="100"></progress>
                         <p>{scanProgressPct.toFixed(1)}%</p>
                         <p className="scan-path" title={currentScanPath}>
@@ -793,28 +793,28 @@ function App() {
 
             <div className="main-layout">
                 <div className={`left-panel ${isLeftPanelCollapsed ? 'collapsed' : ''}`}>
-                    <div className="left-panel-profile-manager">
-                        {isLoading && <p>Loading Profiles...</p>}
+                    <div className="left-panel-project-manager">
+                        {isLoading && <p>Loading Projects...</p>}
                         {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-                        {!isLoading && !profiles.length && !error && ( <p>No profiles found. Click 'New'.</p> )}
+                        {!isLoading && !projects.length && !error && ( <p>No projects found. Click 'New'.</p> )}
                         {!isLoading && (
-                            <ProfileManager
-                                profiles={profiles}
-                                selectedProfileId={selectedProfileId}
-                                onProfileSelect={(id) => {
+                            <ProjectManager
+                                projects={projects}
+                                selectedProjectId={selectedProjectId}
+                                onProjectSelect={(id) => {
                                     // Synchronous state update
-                                    if (isMountedRef.current) setSelectedProfileId(id); 
+                                    if (isMountedRef.current) setSelectedProjectId(id); 
                                 }}
-                                profileTitle={editableTitle}
-                                setProfileTitle={setEditableTitle} // Synchronous, managed by ProfileManager too
+                                projectTitle={editableTitle}
+                                setProjectTitle={setEditableTitle} // Synchronous, managed by ProjectManager too
                                 rootFolder={editableRootFolder}
                                 setRootFolder={setEditableRootFolder} // Synchronous
                                 ignoreText={editableIgnorePatterns}
                                 setIgnoreText={setEditableIgnorePatterns} // Synchronous
-                                onSaveProfile={handleSaveCurrentProfile} // Async, has mounted checks
-                                onCreateProfile={handleCreateNewProfile} // Async, has mounted checks
-                                onDeleteProfile={handleDeleteCurrentProfile} // Async, has mounted checks
-                                onScanProfile={handleScanProfile} // Async, has mounted checks
+                                onSaveProject={handleSaveCurrentProject} // Async, has mounted checks
+                                onCreateProject={handleCreateNewProject} // Async, has mounted checks
+                                onDeleteProject={handleDeleteCurrentProject} // Async, has mounted checks
+                                onScanProject={handleScanProject} // Async, has mounted checks
                                 isScanning={isScanning}
                                 outOfDateFileCount={outOfDateFilePaths.size} 
                             />
@@ -824,7 +824,7 @@ function App() {
                     <Aggregator 
                             selectedPaths={selectedPaths} 
                             treeData={treeData} 
-                            selectedProfileId={selectedProfileId > 0 ? selectedProfileId : null}
+                            selectedProjectId={selectedProjectId > 0 ? selectedProjectId : null}
                         />
                     </div>
                 </div>
@@ -859,17 +859,17 @@ function App() {
                         onToggleExpand={handleToggleExpand} // Synchronous wrapper for setExpandedPaths
                         outOfDateFilePaths={outOfDateFilePaths} 
                     />
-                    {!treeData && selectedProfileId > 0 && !isScanning && !isLoading && (
+                    {!treeData && selectedProjectId > 0 && !isScanning && !isLoading && (
                         <div style={{ padding: '1em', color: '#aaa', fontStyle: 'italic', textAlign: 'center', marginTop: '2em' }}>
                             {error?.includes("invalid data")
-                                ? 'Scan returned no valid data. Check profile settings or backend logs.'
-                                : 'Click "Scan Profile" to analyze files.'
+                                ? 'Scan returned no valid data. Check project settings or backend logs.'
+                                : 'Click "Scan Project" to analyze files.'
                             }
                         </div>
                     )}
-                    {!treeData && selectedProfileId === 0 && !isLoading && (
+                    {!treeData && selectedProjectId === 0 && !isLoading && (
                         <div style={{ padding: '1em', color: '#aaa', fontStyle: 'italic', textAlign: 'center', marginTop: '2em' }}>
-                            Select or create a profile to view files.
+                            Select or create a project to view files.
                         </div>
                     )}
                 </div>
@@ -877,7 +877,7 @@ function App() {
 
             <StatusBar
                 stats={treeStats}
-                lastScanTime={selectedProfile?.updated_at}
+                lastScanTime={selectedProject?.updated_at}
                 outOfDateFileCount={outOfDateFilePaths.size} 
             />
         </div>

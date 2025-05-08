@@ -7,10 +7,10 @@ import { useAggregator, OutputFormat } from '../../../hooks/useAggregator'; // I
 interface AggregatorProps {
     selectedPaths: Set<string>;
     treeData: FileNode | null; 
-    selectedProfileId: number | null; // Added selectedProfileId
+    selectedProjectId: number | null; // Added selectedProjectId
 }
 
-const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, selectedProfileId }) => {
+const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, selectedProjectId }) => {
     const {
         aggregatedText,
         tokenCount,
@@ -22,7 +22,7 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, select
         setPrependFileTree,
         handleCopyToClipboard,
         copySuccess,
-    } = useAggregator({ treeData, selectedPaths, selectedProfileId }); // Pass selectedProfileId
+    } = useAggregator({ treeData, selectedPaths, selectedProjectId }); // Pass selectedProjectId
 
     // Listen for hotkey event to trigger copy
     useEffect(() => {

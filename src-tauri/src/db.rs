@@ -40,7 +40,7 @@ pub fn init_db_tables(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         r#"
         PRAGMA foreign_keys = ON;
-        CREATE TABLE IF NOT EXISTS code_context_builder_profiles (
+        CREATE TABLE IF NOT EXISTS code_context_builder_projects (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             root_folder TEXT,

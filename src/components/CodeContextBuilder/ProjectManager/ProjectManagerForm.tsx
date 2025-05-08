@@ -1,20 +1,20 @@
-// src/components/CodeContextBuilder/ProfileManager/ProfileManagerForm.tsx
+// src/components/CodeContextBuilder/ProjectManager/ProjectManagerForm.tsx
 import React, { useCallback } from "react";
 import { open } from '@tauri-apps/plugin-dialog';
 
-interface ProfileManagerFormProps {
-  profileTitle: string;
-  setProfileTitle: (value: string) => void;
+interface ProjectManagerFormProps {
+  projectTitle: string;
+  setProjectTitle: (value: string) => void;
   rootFolder: string;
   setRootFolder: (value: string) => void;
   ignoreText: string;
   setIgnoreText: (value: string) => void;
-  // onSaveProfile is removed as auto-save is handled by parent
+  // onSaveProject is removed as auto-save is handled by parent
 }
 
-const ProfileManagerForm: React.FC<ProfileManagerFormProps> = ({
-  profileTitle,
-  setProfileTitle,
+const ProjectManagerForm: React.FC<ProjectManagerFormProps> = ({
+  projectTitle,
+  setProjectTitle,
   rootFolder,
   setRootFolder,
   ignoreText,
@@ -46,15 +46,15 @@ const ProfileManagerForm: React.FC<ProfileManagerFormProps> = ({
 One pattern per line.`;
 
   return (
-    <div className="profile-form">
+    <div className="project-form">
       <div className="form-field">
-        <label htmlFor="profileTitle">Title:</label>
+        <label htmlFor="projectTitle">Title:</label>
         <input
-          id="profileTitle"
+          id="projectTitle"
           type="text"
-          value={profileTitle}
-          onChange={(e) => setProfileTitle(e.target.value)}
-          placeholder="Profile Name"
+          value={projectTitle}
+          onChange={(e) => setProjectTitle(e.target.value)}
+          placeholder="Project Name"
         />
       </div>
 
@@ -105,4 +105,4 @@ One pattern per line.`;
   );
 };
 
-export default ProfileManagerForm;
+export default ProjectManagerForm;

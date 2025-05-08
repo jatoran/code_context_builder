@@ -13,7 +13,7 @@ interface TreeStats {
 
 interface StatusBarProps {
     stats: TreeStats;
-    lastScanTime: string | null | undefined; // From Profile.updated_at
+    lastScanTime: string | null | undefined; // From Project.updated_at
     outOfDateFileCount: number; // New prop
 }
 

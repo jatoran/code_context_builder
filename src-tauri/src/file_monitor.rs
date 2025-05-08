@@ -17,7 +17,7 @@ pub struct MonitoredFileDetails {
 // State managed by Tauri, shared with the monitoring thread
 #[derive(Default, Debug)]
 pub struct MonitorState {
-    pub current_profile_id: Option<i32>,
+    pub current_project_id: Option<i32>,
     // Use the new struct here
     pub monitored_files: HashMap<String, MonitoredFileDetails>, 
 }
@@ -36,18 +36,18 @@ fn check_file_freshness_and_emit(
     monitor_state_arc: Arc<Mutex<MonitorState>>,
 ) {
     let mut out_of_date_paths: Vec<String> = Vec::new();
-    let (profile_id_opt, files_to_check) = {
+    let (project_id_opt, files_to_check) = {
         let state_guard = monitor_state_arc.lock().unwrap();
         // Clone data needed for checks to release lock quickly
-        (state_guard.current_profile_id, state_guard.monitored_files.clone())
+        (state_guard.current_project_id, state_guard.monitored_files.clone())
     };
 
-    if profile_id_opt.is_none() || files_to_check.is_empty() {
-        // No profile selected or no files to monitor for it
+    if project_id_opt.is_none() || files_to_check.is_empty() {
+        // No project selected or no files to monitor for it
         return;
     }
 
-    // println!("[Monitor] Checking {} files for profile {:?}", files_to_check.len(), profile_id_opt.unwrap());
+    // println!("[Monitor] Checking {} files for project {:?}", files_to_check.len(), project_id_opt.unwrap());
 
     for (path_str, stored_details) in files_to_check.iter() { // Iterate over MonitoredFileDetails
         let path = Path::new(path_str);
@@ -100,8 +100,8 @@ pub fn monitoring_thread_function(
 }
 
 #[tauri::command]
-pub fn start_monitoring_profile_cmd(
-    profile_id: i32,
+pub fn start_monitoring_project_cmd(
+    project_id: i32,
     // Removed incorrect #[serde(alias = "filesToMonitor")]
     files_to_monitor: HashMap<String, MonitoredFileDetails>, 
     monitor_state: State<'_, Arc<Mutex<MonitorState>>>,
@@ -112,11 +112,11 @@ pub fn start_monitoring_profile_cmd(
         .map_err(|e| format!("Failed to lock monitor state: {}", e))?;
 
     // println!(
-    //     "[Monitor CMD] Starting monitoring for profile ID: {}. Files: {}",
-    //     profile_id,
+    //     "[Monitor CMD] Starting monitoring for project ID: {}. Files: {}",
+    //     project_id,
     //     files_to_monitor.len()
     // );
-    state_guard.current_profile_id = Some(profile_id);
+    state_guard.current_project_id = Some(project_id);
     state_guard.monitored_files = files_to_monitor;
 
     if let Err(e) = app_handle.emit_to("main", "file-freshness-update", Vec::<String>::new()) {
@@ -126,7 +126,7 @@ pub fn start_monitoring_profile_cmd(
 }
 
 #[tauri::command]
-pub fn stop_monitoring_profile_cmd(
+pub fn stop_monitoring_project_cmd(
     monitor_state: State<'_, Arc<Mutex<MonitorState>>>,
     app_handle: AppHandle, // To emit an immediate empty update
 ) -> Result<(), String> {
@@ -134,12 +134,12 @@ pub fn stop_monitoring_profile_cmd(
         .lock()
         .map_err(|e| format!("Failed to lock monitor state: {}", e))?;
 
-    if state_guard.current_profile_id.is_some() {
-        // println!("[Monitor CMD] Stopping monitoring for profile ID: {:?}", state_guard.current_profile_id.unwrap());
+    if state_guard.current_project_id.is_some() {
+        // println!("[Monitor CMD] Stopping monitoring for project ID: {:?}", state_guard.current_project_id.unwrap());
     } else {
-        // println!("[Monitor CMD] Stop monitoring called, but no profile was being monitored.");
+        // println!("[Monitor CMD] Stop monitoring called, but no project was being monitored.");
     }
-    state_guard.current_profile_id = None;
+    state_guard.current_project_id = None;
     state_guard.monitored_files.clear();
 
     // Emit an empty array to clear any existing stale markers on the frontend
