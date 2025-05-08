@@ -107,6 +107,7 @@ fn main() {
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())  
         .invoke_handler(tauri::generate_handler![
             projects::list_code_context_builder_projects,
             projects::save_code_context_builder_project,

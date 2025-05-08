@@ -1,3 +1,4 @@
+
 // src/App.tsx
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import "./App.css";
@@ -7,7 +8,7 @@ import Aggregator from "./components/CodeContextBuilder/Aggregator/Aggregator";
 import StatusBar from "./components/CodeContextBuilder/StatusBar";
 import FileViewerModal from "./components/CodeContextBuilder/FileViewerModal";
 import HotkeysModal from "./components/CodeContextBuilder/HotkeysModal";
-import SettingsModal, { ThemeSetting } from "./components/CodeContextBuilder/SettingsModal"; // Import SettingsModal and ThemeSetting
+import SettingsModal, { ThemeSetting } from "./components/CodeContextBuilder/SettingsModal";
 import { Project } from "./types/projects";
 import { FileNode } from "./types/scanner";
 import { invoke } from "@tauri-apps/api/core";
@@ -16,6 +17,7 @@ import { Window, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
 import { findNodeByPath as findNodeByPathUtil } from "./components/CodeContextBuilder/FileTree/fileTreeUtils";
 
 
+// ... (existing interfaces and helper functions: ScanProgressPayload, MonitoredFile, debounce, getAllFilePaths, getMonitorableFilesFromTree, TreeStats, calculateTreeStats) ...
 interface ScanProgressPayload {
     progress: number;
     current_path: string;
@@ -83,7 +85,9 @@ const calculateTreeStats = (node: FileNode | null): TreeStats => {
     return stats;
 };
 
+
 function App() {
+    // ... (existing state variables) ...
     const isMountedRef = useRef(true);
     const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<number>(0);
@@ -111,10 +115,10 @@ function App() {
     const searchInputRef = useRef<HTMLInputElement>(null);
     const prevProjectId = useRef<number | null>(null);
 
-    // Settings Modal and Theme State
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
-    const [currentTheme, setCurrentTheme] = useState<ThemeSetting>('system'); // Persisted theme setting
+    const [currentTheme, setCurrentTheme] = useState<ThemeSetting>('system');
 
+    // ... (existing useEffect hooks for isMountedRef, theme loading, theme applying, global copy success, window geometry, file monitoring, scan listeners, scan state persistence) ...
     useEffect(() => { isMountedRef.current = true; return () => { isMountedRef.current = false; }; }, []);
 
     // Load persisted theme setting on mount
@@ -171,7 +175,6 @@ function App() {
     
     const handleThemeSettingChange = useCallback((theme: ThemeSetting) => {
         if (isMountedRef.current) setCurrentTheme(theme);
-        // Persisting the theme is now handled by the SettingsModal's save button
     }, []);
 
 
@@ -291,6 +294,7 @@ function App() {
         return () => { localIsMountedRef.current = false; unlistenFreshness?.(); };
     }, []);
 
+
     const loadProjects = useCallback(async (selectId?: number) => {
         if (isMountedRef.current) { setIsLoading(true); setError(null); }
         try {
@@ -323,6 +327,7 @@ function App() {
         return () => { localIsMountedRef.current = false; };
     }, [loadProjects]);
 
+    // ... (Other useEffect hooks: project selection change, local storage for paths/expanded, left panel collapse) ...
     useEffect(() => {
         const project = projects.find(p => p.id === selectedProjectId);
         if (prevProjectId.current !== selectedProjectId) {
@@ -391,6 +396,8 @@ function App() {
         else localStorage.removeItem('ccb_scanState');
     }, [isScanning, scanProgressPct, currentScanPath]);
 
+
+    // ... (existing handlers: handleSaveCurrentProject, handleCreateNewProject, handleDeleteCurrentProject, handleScanProject, handleCancelScan, handleToggleSelection, handleToggleExpand, handleViewFile, handleCloseModal, handleOpenHotkeysModal, handleCloseHotkeysModal) ...
     const handleSaveCurrentProject = useCallback(async () => {
         if (!selectedProjectId || typeof invoke !== 'function') {
             if (isMountedRef.current) setError("Cannot save: No project selected or API not ready."); return "no_project";
@@ -416,11 +423,10 @@ function App() {
         }
         const newTitle = prompt("Enter new project title:");
         if (newTitle && newTitle.trim()) {
-            // Backend will now apply default ignore patterns if ignore_patterns is empty or not sent.
             const newProjectData: Partial<Omit<Project, 'id' | 'updated_at' | 'ignore_patterns'>> & { ignore_patterns?: string[] } = {
                 title: newTitle.trim(),
                 root_folder: null,
-                ignore_patterns: [] // Send empty, backend will use defaults from app_settings
+                ignore_patterns: [] 
             };
             try {
                 const newId = await invoke<number>("save_code_context_builder_project", { project: newProjectData });
@@ -492,9 +498,19 @@ function App() {
     const handleCloseModal = useCallback(() => setViewingFilePath(null), []);
     const handleOpenHotkeysModal = useCallback(() => setIsHotkeysModalOpen(true), []);
     const handleCloseHotkeysModal = useCallback(() => setIsHotkeysModalOpen(false), []);
-    const handleOpenSettingsModal = useCallback(() => setIsSettingsModalOpen(true), []); // New
-    const handleCloseSettingsModal = useCallback(() => setIsSettingsModalOpen(false), []); // New
 
+    const handleOpenSettingsModal = useCallback(() => setIsSettingsModalOpen(true), []);
+    const handleCloseSettingsModal = useCallback(() => setIsSettingsModalOpen(false), []);
+
+    // Callback for when import is complete, to refresh projects
+    const handleImportComplete = useCallback(() => {
+        loadProjects(); // Reloads projects which will update the UI
+        // Optionally, could select the first newly imported project or last one.
+        // For now, just reloading the list is fine.
+    }, [loadProjects]);
+
+
+    // ... (existing handleGlobalKeyDown, treeStats, stopFileMonitoring cleanup, handleSearchInputKeyDown, handleClearSearch, selectedProject memo) ...
     const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
         const target = event.target as HTMLElement;
         const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
@@ -524,16 +540,19 @@ function App() {
             {showGlobalCopySuccess && (<div className="global-copy-success-toast">Copied to clipboard!</div>)}
             {viewingFilePath && (<FileViewerModal filePath={viewingFilePath} onClose={handleCloseModal} />)}
             {isHotkeysModalOpen && (<HotkeysModal isOpen={isHotkeysModalOpen} onClose={handleCloseHotkeysModal} />)}
-            {isSettingsModalOpen && ( /* New Settings Modal */
+            {isSettingsModalOpen && (
                 <SettingsModal 
                     isOpen={isSettingsModalOpen} 
                     onClose={handleCloseSettingsModal}
                     currentTheme={currentTheme}
                     onThemeChange={handleThemeSettingChange} 
+                    projects={projects} // Pass projects for export
+                    onImportComplete={handleImportComplete} // Pass callback for import refresh
                 />
             )}
             {isScanning && (
                 <div className="scan-overlay">
+                    {/* ... (scan overlay content) ... */}
                     <div className="scan-indicator">
                         <h3>Scanning Project...</h3>
                         <progress value={scanProgressPct} max="100"></progress>
@@ -545,6 +564,7 @@ function App() {
             )}
 
             <div className="main-layout">
+                {/* ... (left panel: ProjectManager, Aggregator) ... */}
                 <div className={`left-panel ${isLeftPanelCollapsed ? 'collapsed' : ''}`}>
                     <div className="left-panel-project-manager">
                         {isLoading && <p>Loading Projects...</p>}
@@ -566,6 +586,7 @@ function App() {
                 </div>
 
                 <div className="file-tree-main-content">
+                    {/* ... (file tree header) ... */}
                      <div className="file-tree-header">
                         <button className="collapse-toggle-btn" onClick={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)} title={isLeftPanelCollapsed ? "Show Left Panel" : "Hide Left Panel"}>
                             {isLeftPanelCollapsed ? '▶' : '◀'}
@@ -578,7 +599,7 @@ function App() {
                             {searchTerm && (<button onClick={handleClearSearch} title="Clear Search (Esc)">✕</button>)}
                         </div>
                         <button onClick={handleOpenHotkeysModal} title="View Keyboard Shortcuts" className="hotkeys-help-btn">?</button>
-                        <button onClick={handleOpenSettingsModal} title="Application Settings" className="settings-btn">⚙️</button> {/* New Settings Button */}
+                        <button onClick={handleOpenSettingsModal} title="Application Settings" className="settings-btn">⚙️</button>
                     </div>
                     <FileTree
                         ref={fileTreeRef} treeData={treeData} selectedPaths={selectedPaths} onToggleSelection={handleToggleSelection}

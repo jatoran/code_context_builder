@@ -13,6 +13,9 @@
     "core:window:allow-show",
     "core:window:allow-available-monitors",
     "core:window:allow-set-focus",
-    "dialog:default"
+    "dialog:default",
+    "fs:default",
+    "fs:allow-write-text-file",
+    "fs:allow-read-text-file"
   ]
 }
