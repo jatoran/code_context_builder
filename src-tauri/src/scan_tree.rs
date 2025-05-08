@@ -221,9 +221,9 @@ fn path_ignored_by_patterns(
                 matched_by_current_pattern = true;
             }
             // If you still need a general contains for some patterns, add it here with caution:
-            // else if path_lc.contains(&pat_lc) {
-            //     matched_by_current_pattern = true;
-            // }
+            else if path_lc.contains(&pat_lc) {
+                matched_by_current_pattern = true;
+            }
         }
 
         if matched_by_current_pattern {
