@@ -453,12 +453,53 @@ label { display: block; margin-bottom: 0.2em; font-size: 0.9em; color: var(--lab
 .project-form button.browse-button { padding: 0.4rem; font-size: 1em; flex-shrink: 0; margin: 0; line-height: 1; background-color: var(--card-bg-color); border-color: var(--border-color); min-width: auto; }
 .project-form button.browse-button:hover { background-color: var(--accent-color); border-color: var(--accent-color); }
 
-.save-status { font-size: 0.8em; padding: 0.2em 0.5em; border-radius: 3px; margin-left: 0.5em; opacity: 0; transition: opacity 0.3s; }
-.save-status.visible { opacity: 1; }
-.save-status.saving { color: #ccc; background-color: rgba(80,80,80,0.5); }
-.save-status.saved { color: lightgreen; background-color: rgba(70,150,70,0.3); }
-.save-status.error { color: var(--danger-color); background-color: rgba(150,70,70,0.3); }
+.save-status {
+  font-size: 0.8em;
+  padding: 0.2em 0.5em;
+  height:25px;
+  border-radius: 3px;
+  margin-left: 0.5em; /* Keep margin to space it from the label */
+  opacity: 0; /* Start fully transparent */
+  visibility: hidden; /* Start hidden but occupying space */
+  transition: opacity 0.3s ease-in-out, visibility 0s linear 0.3s; /* Delay visibility change on hide */
+  box-sizing: border-box; /* Ensures padding is included in min-width */
+  display: inline-block; /* Allows min-width and vertical-align */
+  min-width: 6.5em;     /* Fixed width to accommodate "Save Error!" + padding */
+  text-align: right;   /* Aligns text within the fixed width span */
+  vertical-align: middle; /* Helps align with the "Project:" label */
+  /* Background and color will be applied by specific status classes */
+}
+.save-status.visible {
+  opacity: 1;
+  visibility: visible; /* Make it visible */
+  transition: opacity 0.3s ease-in-out, visibility 0s linear 0s; /* Immediate visibility change on show */
+}
+.save-status.saving {
+  color: #ccc;
+  background-color: rgba(80,80,80,0.5);
+}
+.save-status.saved {
+  color: lightgreen;
+  background-color: rgba(70,150,70,0.3);
+}
+.save-status.error {
+  color: var(--danger-color);
+  background-color: rgba(150,70,70,0.3);
+}
 
+/* Light Theme Overrides for save-status */
+html.theme-light .save-status.saving {
+  color: #555;
+  background-color: rgba(180,180,180,0.5);
+}
+html.theme-light .save-status.saved {
+  color: darkgreen;
+  background-color: rgba(150,230,150,0.3);
+}
+html.theme-light .save-status.error {
+  color: var(--danger-color); /* Uses the themed danger color */
+  background-color: rgba(230,150,150,0.3);
+}
 
 /* --------------------------------------------------------------------------
    File Tree Area (in file-tree-main-content)

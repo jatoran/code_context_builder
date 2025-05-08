@@ -13,7 +13,7 @@ interface ProjectManagerProps {
   setRootFolder: (value: string) => void;
   ignoreText: string;
   setIgnoreText: (value: string) => void;
-  onSaveProject: () => Promise<'saved' | 'error' | 'no_project'>; 
+  onSaveProject: () => Promise<'saved' | 'error' | 'no_project'>;
   onCreateProject: () => void;
   onDeleteProject: () => void;
   onScanProject: () => void;
@@ -90,11 +90,11 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         setSaveStatus('error');
         setTimeout(() => { if (isMountedRef.current) setSaveStatus('idle'); }, 3000);
       }
-    }, 750); 
+    }, 750);
   }, [onSaveProject, projectSelected]);
 
   useEffect(() => {
-    if (projectSelected && !isScanning) { 
+    if (projectSelected && !isScanning) {
       triggerAutoSave();
     }
   }, [projectTitle, rootFolder, ignoreText, projectSelected, isScanning, triggerAutoSave]);
@@ -105,7 +105,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         case 'saving': return 'Saving...';
         case 'saved': return 'Saved ✓';
         case 'error': return 'Save Error!';
-        default: return '';
+        default: return ''; // Return empty for 'idle' to make it truly invisible with opacity
     }
   };
 
@@ -117,12 +117,12 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     ? `Rescan recommended (${outOfDateFileCount} file${outOfDateFileCount === 1 ? '' : 's'} changed)`
     : "Scan files for selected project";
 
-  const scanButtonIcon = isScanning 
-    ? '⏳' 
-    : outOfDateFileCount > 0 
-    ? '🔄' 
+  const scanButtonIcon = isScanning
+    ? '⏳'
+    : outOfDateFileCount > 0
+    ? '🔄'
     : '🔍';
-  
+
   const scanButtonClasses = [];
   if (outOfDateFileCount > 0 && !isScanning) {
     scanButtonClasses.push('scan-btn-stale');
@@ -135,21 +135,27 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     <div className="project-manager">
       {/* Combined row for Project Label and Save Status */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '1.2em' /* Ensure minimum height for the row */ }}>
-        <label 
-            htmlFor="projectSelectorDropdown" 
-            style={{ 
-                fontSize: '0.9em', 
-                color: 'var(--label-text-color)', 
-                marginBottom: '0' /* Override global label margin */ 
+        <label
+            htmlFor="projectSelectorDropdown"
+            style={{
+                fontSize: '0.9em',
+                color: 'var(--label-text-color)',
+                marginBottom: '0' /* Override global label margin */
             }}
         >
           Project:
         </label>
-        {projectSelected && saveStatus !== 'idle' && (
-            <span className={`save-status ${saveStatus} visible`}>{getSaveStatusMessage()}</span>
+        {projectSelected && (
+          <span
+            className={`save-status ${saveStatus} ${saveStatus !== 'idle' ? 'visible' : ''}`}
+            // Inline styles for min-width, text-align, display are removed
+            // and will be handled by the CSS class.
+          >
+            {getSaveStatusMessage()}
+          </span>
         )}
       </div>
-      
+
       {/* Project selection dropdown */}
       <div className="pm-row-select">
         <select
@@ -173,12 +179,12 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         <div className="pm-buttons-group-left">
           <button onClick={onCreateProject} disabled={isScanning} title="Create a new project">➕</button>
           <button onClick={onDeleteProject} disabled={!projectSelected || isScanning} title="Delete the selected project">🗑️</button>
-          <button 
-              onClick={() => setShowSettings(!showSettings)} 
-              disabled={isScanning || !projectSelected} 
+          <button
+              onClick={() => setShowSettings(!showSettings)}
+              disabled={isScanning || !projectSelected}
               title={showSettings ? "Hide Project Settings" : "Show Project Settings"}
           >
-            {showSettings ? '⚙️' : '⚙️'} 
+            {showSettings ? '⚙️' : '⚙️'}
           </button>
         </div>
         <button

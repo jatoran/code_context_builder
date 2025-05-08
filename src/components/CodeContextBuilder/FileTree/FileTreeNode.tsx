@@ -21,6 +21,59 @@ interface FileTreeNodeProps {
     outOfDateFilePaths: Set<string>;
 }
 
+const CODE_FILE_EXTENSIONS = new Set([
+    'js', 'jsx', 'ts', 'tsx', // JavaScript/TypeScript
+    'py', // Python
+    'java', // Java
+    'c', 'cpp', 'h', 'hpp', 'cxx', 'hxx', // C/C++
+    'cs', // C#
+    'go', // Go
+    'rs', // Rust
+    'rb', // Ruby
+    'php', // PHP
+    'swift', // Swift
+    'kt', 'kts', // Kotlin
+    'html', 'htm', // HTML
+    'css', 'scss', 'less', // CSS/Sass/Less
+    'vue', // Vue
+    'json', // JSON
+    'yaml', 'yml', // YAML
+    'md', 'markdown', // Markdown
+    'sh', 'bash', 'zsh', // Shell scripts
+    'bat', 'cmd', // Batch scripts
+    'ps1', // PowerShell
+    'sql', // SQL
+    'graphql', 'gql', // GraphQL
+    'dockerfile', 'Dockerfile', // Dockerfile
+    'r', // R
+    'pl', 'pm', // Perl
+    'lua', // Lua
+    'dart', // Dart
+    'ex', 'exs', // Elixir
+    'conf', 'config', 'ini', 'cfg', 'toml', // Config files
+    'xml', // XML
+    'csproj', 'vbproj', 'fsproj', 'sln', 'props', 'targets', 'build', // .NET Project/Build files
+    'gradle', // Gradle
+    'pom', // Maven POM
+    'tf', // Terraform
+    'sum', 'mod', 'work', // Go module files
+    'lock', // Lock files (generic)
+    'env', // Environment files
+    'gitignore', 'gitattributes', 'gitmodules', // Git files
+]);
+
+function getFileIcon(fileName: string, isDir: boolean): string {
+    if (isDir) return '📁';
+
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    if (extension && CODE_FILE_EXTENSIONS.has(extension)) {
+        return '💻'; // Code icon (Personal Computer emoji)
+    }
+    if (extension === 'txt' || extension === 'log') {
+        return '📝'; // Memo icon for .txt, .log files
+    }
+    return '📄'; // Default file icon (Page with Curl emoji)
+}
 
 const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
     node,
@@ -181,8 +234,17 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                       <span className="node-checkbox-placeholder"></span>
                  )}
 
-                <span className="node-icon" role="img" aria-label={node.is_dir ? "Folder" : "File"}>{node.is_dir ? '📁' : '📄'}</span>
-
+                <span
+                    className="node-icon"
+                    role="img"
+                    aria-label={
+                        node.is_dir ? "Folder" :
+                        (getFileIcon(node.name, false) === '💻' ? "Code File" :
+                        (getFileIcon(node.name, false) === '📝' ? "Text File" : "File"))
+                    }
+                >
+                    {getFileIcon(node.name, node.is_dir)}
+                </span>
                 <span
                     title={nameTitle}
                     // Apply 'highlight' class to node-name for text snippet match,
