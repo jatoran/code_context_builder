@@ -1,12 +1,14 @@
-
 // src-tauri/src/projects.rs
+
+// ... (other use statements and map_row_to_project function) ...
 use crate::db::AppState;
-use crate::types::Project; // Use the shared Project struct from types.rs
-use crate::app_settings; // Import app_settings module for internal helper
+use crate::types::Project;
+// REMOVE: use crate::app_settings; // No longer needed here for default pattern fetching during save
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension, Result as SqlResult, Transaction};
 use serde_json;
 use tauri::{command, State};
+
 
 // Helper function to map a database row to a Project struct
 // Adjust column indices based on the SELECT query
@@ -32,8 +34,10 @@ fn map_row_to_project(row: &rusqlite::Row<'_>) -> SqlResult<Project> {
 
 // --- Exposed Tauri Commands ---
 
+
 #[command]
 pub fn list_code_context_builder_projects(state: State<AppState>) -> Result<Vec<Project>, String> {
+    // ... (this function remains the same) ...
     let conn_guard = state.conn.lock().map_err(|e| format!("DB lock failed: {}", e))?;
     let conn = &*conn_guard; 
 
@@ -64,46 +68,21 @@ pub fn list_code_context_builder_projects(state: State<AppState>) -> Result<Vec<
 #[command]
 pub fn save_code_context_builder_project(
     state: State<AppState>,
-    project: Project, 
+    project: Project, // Project object from frontend
 ) -> Result<i32, String> {
     let conn_guard = state.conn.lock().map_err(|e| format!("DB lock failed for save: {}", e))?;
     let conn = &*conn_guard;
-    let now = Utc::now().to_rfc3339(); 
-
+    let now = Utc::now().to_rfc3339();
     let prefix_val = project.prefix.clone();
 
     if project.id <= 0 {
         // --- Create new project ---
-        let final_ignore_patterns = if project.ignore_patterns.is_empty() {
-            // Fetch default_ignore_patterns from app_settings table
-            match app_settings::get_setting_internal(&conn, "default_ignore_patterns") {
-                Ok(Some(default_patterns_json_str)) => {
-                    serde_json::from_str(&default_patterns_json_str).unwrap_or_else(|e| {
-                        eprintln!(
-                            "Failed to parse default_ignore_patterns from DB ('{}'): {}, using empty list.",
-                            default_patterns_json_str, e
-                        );
-                        Vec::new() // Fallback to empty vec on parse error
-                    })
-                }
-                Ok(None) => {
-                    eprintln!("No default_ignore_patterns found in DB, using empty list for new project.");
-                    Vec::new() // No default set, use empty
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Error fetching default_ignore_patterns from DB: {}, using empty list.",
-                        e
-                    );
-                    Vec::new() // Error fetching, use empty
-                }
-            }
-        } else {
-            project.ignore_patterns.clone() // Use what was sent if not empty
-        };
-        
-        let ignore_json = serde_json::to_string(&final_ignore_patterns)
-            .map_err(|e| format!("Failed to serialize ignore_patterns: {}", e))?;
+        // The `project.ignore_patterns` from the frontend contains the project-specific patterns.
+        // If the UI for new projects starts with an empty textarea for project-specific ignores,
+        // then `project.ignore_patterns` will be an empty Vec here. This is correct.
+        // We are NOT merging global defaults into the project's stored patterns at creation time.
+        let project_specific_ignore_patterns_json = serde_json::to_string(&project.ignore_patterns)
+            .map_err(|e| format!("Failed to serialize project-specific ignore_patterns: {}", e))?;
 
         let result = conn.execute(
             r#"
@@ -114,20 +93,21 @@ pub fn save_code_context_builder_project(
             params![
                 project.title,
                 project.root_folder,
-                ignore_json,
+                project_specific_ignore_patterns_json, // Store only project-specific patterns
                 now,
                 prefix_val
             ],
         );
         match result {
-            Ok(_) => Ok(conn.last_insert_rowid() as i32), 
+            Ok(_) => Ok(conn.last_insert_rowid() as i32),
             Err(e) => Err(format!("Failed to insert new project: {}", e)),
         }
     } else {
         // --- Update existing project ---
-        // For updates, we assume ignore_patterns are explicitly provided as part of the project object
-        let ignore_json = serde_json::to_string(&project.ignore_patterns)
-            .map_err(|e| format!("Failed to serialize ignore_patterns: {}", e))?;
+        // `project.ignore_patterns` contains the full set of project-specific patterns
+        // as edited by the user.
+        let project_specific_ignore_patterns_json = serde_json::to_string(&project.ignore_patterns)
+            .map_err(|e| format!("Failed to serialize project-specific ignore_patterns: {}", e))?;
 
         let result = conn.execute(
             r#"
@@ -138,9 +118,9 @@ pub fn save_code_context_builder_project(
             params![
                 project.title,
                 project.root_folder,
-                ignore_json,
+                project_specific_ignore_patterns_json, // Store only project-specific patterns
                 now,
-                prefix_val, 
+                prefix_val,
                 project.id
             ],
         );
@@ -149,7 +129,7 @@ pub fn save_code_context_builder_project(
                  if rows_affected == 0 {
                      Err(format!("Failed to update project: ID {} not found.", project.id))
                  } else {
-                     Ok(project.id) 
+                     Ok(project.id)
                  }
              },
              Err(e) => Err(format!("Failed to update project ID {}: {}", project.id, e)),
@@ -162,6 +142,7 @@ pub fn delete_code_context_builder_project(
     state: State<AppState>,
     project_id: i32,
 ) -> Result<(), String> {
+    // ... (this function remains the same) ...
     let conn = state.conn.lock().map_err(|e| format!("DB lock failed for delete: {}", e))?;
 
     let rows_affected = conn.execute(
@@ -173,14 +154,14 @@ pub fn delete_code_context_builder_project(
     if rows_affected == 0 {
          eprintln!("Warning: Attempted to delete project ID {}, but it was not found.", project_id);
     } else {
-        println!("Successfully deleted project ID: {}", project_id);
+        // println!("Successfully deleted project ID: {}", project_id);
     }
     Ok(())
 }
 
-
 // --- Internal Helper Functions ---
 pub fn load_project_by_id(conn: &Connection, project_id: i32) -> Result<Project, String> {
+    // ... (this function remains the same, it loads the project including its specific ignores) ...
      let mut stmt = conn
          .prepare(
               r#"
@@ -197,6 +178,7 @@ pub fn load_project_by_id(conn: &Connection, project_id: i32) -> Result<Project,
           .ok_or_else(|| format!("Project with ID {} not found.", project_id)) 
 }
 
+// rename_project_prefix function remains the same (and unused currently)
 #[allow(dead_code)]
 fn rename_project_prefix(
     _tx: &Transaction,

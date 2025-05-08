@@ -12,7 +12,8 @@ mod scan_state;
 mod scan_tree;
 mod utils;
 mod file_monitor;
-mod app_settings; // Added app_settings module
+mod app_settings;
+mod ignore_handler;
 
 // Import necessary items
 use db::{AppState, init_connection, init_db_tables};

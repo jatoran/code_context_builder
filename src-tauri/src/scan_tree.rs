@@ -1,8 +1,10 @@
+
 // src-tauri/src/scan_tree.rs
 
 use crate::types::FileNode;
 use crate::scan_cache::CacheEntry;
 use crate::scan_state::is_scan_cancelled;
+use crate::ignore_handler::CompiledIgnorePatterns; // <--- ADD THIS
 use std::fs;
 use std::path::{Path, PathBuf, Component};
 use std::time::SystemTime;
@@ -51,7 +53,7 @@ pub fn build_tree_from_paths(
 
     if valid_paths.is_empty() {
         finalize_node(&mut root_node); 
-        println!("[BUILD_TREE_POST_FINALIZE] Root Node '{}' (empty valid_paths) Final L/T/S: {}/{}/{}", root_node.name, root_node.lines, root_node.tokens, root_node.size);
+        // println!("[BUILD_TREE_POST_FINALIZE] Root Node '{}' (empty valid_paths) Final L/T/S: {}/{}/{}", root_node.name, root_node.lines, root_node.tokens, root_node.size);
         return root_node;
     }
 
@@ -97,7 +99,7 @@ pub fn build_tree_from_paths(
     }
     
     finalize_node(&mut root_node);
-    println!("[BUILD_TREE_POST_FINALIZE] Root Node '{}' Final L/T/S: {}/{}/{}", root_node.name, root_node.lines, root_node.tokens, root_node.size);
+    // println!("[BUILD_TREE_POST_FINALIZE] Root Node '{}' Final L/T/S: {}/{}/{}", root_node.name, root_node.lines, root_node.tokens, root_node.size);
     root_node
 }
 
@@ -122,15 +124,19 @@ fn insert_node_recursive(
         if let Some(index) = child_dir_node_index {
             insert_node_recursive(&mut current_node.children[index], remaining_components, node_to_insert);
         } else {
+            // This case might occur if a parent directory was filtered out but a child wasn't,
+            // which shouldn't happen if `gather_valid_items` correctly processes directories first.
+            // Or, if the path components are malformed relative to the actual file system structure.
+            // eprintln!("[INSERT_NODE] Could not find child directory '{}' in '{}' to insert '{}'", target_name, current_node.path, node_to_insert.path);
             return;
         }
     }
 }
 
-// --- UPDATED gather_valid_items with logging ---
+// --- UPDATED gather_valid_items ---
 pub fn gather_valid_items(
     path: &PathBuf,
-    ignore_patterns: &[String],
+    compiled_ignores: &CompiledIgnorePatterns, // <--- MODIFIED: Pass CompiledIgnorePatterns
     collected: &mut Vec<PathBuf>,
     depth: usize,
 ) {
@@ -138,17 +144,20 @@ pub fn gather_valid_items(
 
     const MAX_DEPTH: usize = 30;
     if depth > MAX_DEPTH {
+        // println!("[GATHER DEPTH_LIMIT] Path: {}", path.display());
         return;
     }
 
-    if path_ignored_by_patterns(path, ignore_patterns) { 
+    // Use the new compiled_ignores.is_ignored method
+    if compiled_ignores.is_ignored(path, path.is_dir()) { 
+        // println!("[GATHER IGNORE] Path: {}", path.display()); // For debugging
         return;
     }
 
-    // If not ignored, add it
+    // If not ignored, add it. Check for duplicates might not be strictly necessary
+    // if the traversal logic ensures each path is visited once, but doesn't hurt.
     if !collected.contains(path) { 
-        // UNCOMMENTED THIS LINE FOR DEBUGGING
-        println!("[GATHER KEEP] Path: {}", path.display());
+        // println!("[GATHER KEEP] Path: {}", path.display()); // For debugging
         collected.push(path.clone());
     }
 
@@ -159,81 +168,24 @@ pub fn gather_valid_items(
                     if is_scan_cancelled() { return; }
                     match entry_result {
                         Ok(entry) => {
-                            gather_valid_items(
+                            gather_valid_items( // Recursive call
                                 &entry.path(),
-                                ignore_patterns,
+                                compiled_ignores, // Pass it down
                                 collected,
                                 depth + 1,
                             );
                         }
-                        Err(_e) => {}
+                        Err(_e) => { /* eprintln!("[GATHER READ_ENTRY_ERROR] For path {:?}: {}", entry.path(), _e); */ }
                     }
                 }
             }
-            Err(_e) => {}
+            Err(_e) => { /* eprintln!("[GATHER READ_DIR_ERROR] For path {}: {}", path.display(), _e); */ }
         }
     }
 }
 
-// --- UPDATED path_ignored_by_patterns with logging ---
-fn path_ignored_by_patterns(
-    real_path: &std::path::Path,
-    ignore_patterns: &[String],
-) -> bool {
-    let path_lc = real_path.to_string_lossy().to_lowercase(); 
-    let mut segments: Option<Vec<String>> = None;
-
-    for raw_pat in ignore_patterns {
-        let pat_trim = raw_pat.trim();
-        if pat_trim.is_empty() { continue; }
-
-        let mut matched_by_current_pattern = false;
-
-        if pat_trim.starts_with('/') && pat_trim.ends_with('/') && pat_trim.len() > 2 { // e.g. /node_modules/
-            let folder_name_to_match = &pat_trim[1..pat_trim.len() - 1].to_lowercase(); 
-            if !folder_name_to_match.is_empty() {
-                if segments.is_none() {
-                    segments = Some(real_path.components().filter_map(|comp| comp.as_os_str().to_str()).map(|s| s.to_lowercase()).collect());
-                }
-                if let Some(ref segs) = segments {
-                    if segs.iter().any(|seg| seg == folder_name_to_match) {
-                        matched_by_current_pattern = true;
-                    }
-                }
-            }
-        } else if pat_trim.starts_with('"') && pat_trim.ends_with('"') && pat_trim.len() >= 2 { // e.g. "exact/path"
-            let exact_path_to_match = pat_trim[1..pat_trim.len() - 1].to_lowercase();
-            if path_lc == exact_path_to_match {
-                matched_by_current_pattern = true;
-            }
-        } else { // Simple contains check for other patterns (e.g. "Cargo.toml", "*.log")
-            let pat_lc = pat_trim.to_lowercase();
-            // For wildcard patterns like "*.log", we should check the extension or filename.
-            // For simple names like "Cargo.toml", we should check the filename.
-            // A general 'contains' is too broad.
-            if pat_lc.starts_with("*.") { // Handle *.ext patterns
-                 let extension_to_match = &pat_lc[2..];
-                 if real_path.extension().map_or(false, |ext| ext.to_string_lossy().to_lowercase() == extension_to_match) {
-                     matched_by_current_pattern = true;
-                 }
-            } else if real_path.file_name().map_or(false, |name| name.to_string_lossy().to_lowercase() == pat_lc) {
-                // Match specific filenames like "Cargo.toml"
-                matched_by_current_pattern = true;
-            }
-            // If you still need a general contains for some patterns, add it here with caution:
-            else if path_lc.contains(&pat_lc) {
-                matched_by_current_pattern = true;
-            }
-        }
-
-        if matched_by_current_pattern {
-            // UNCOMMENTED THIS LINE FOR DEBUGGING
-            println!("[IGNORE MATCH] Path: '{}' matched ignore pattern: '{}'", real_path.display(), pat_trim);
-            return true; 
-        }
-    }
-    false 
-}
+// --- REMOVE THE OLD path_ignored_by_patterns FUNCTION ---
+// fn path_ignored_by_patterns( ... ) { ... } // This whole function should be deleted
 
 // --- file_modified_timestamp (Unchanged) ---
 pub fn file_modified_timestamp(metadata: &fs::Metadata) -> String {
