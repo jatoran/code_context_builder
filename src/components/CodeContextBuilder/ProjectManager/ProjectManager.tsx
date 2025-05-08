@@ -15,10 +15,10 @@ interface ProjectManagerProps {
   setIgnoreText: (value: string) => void;
   onSaveProject: () => Promise<'saved' | 'error' | 'no_project'>;
   onCreateProject: () => void;
-  onDeleteProject: () => void;
+  onDeleteProject: () => void; // This will now be called after internal confirmation
   onScanProject: () => void;
   isScanning: boolean;
-  outOfDateFileCount: number; // New prop for stale file indication
+  outOfDateFileCount: number;
 }
 
 function safeSetItem(key: string, value: any) {
@@ -51,7 +51,10 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
   const [showSettings, setShowSettings] = useState<boolean>(() => safeGetItem('ccb_showProjectSettings', true));
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const saveTimeoutRef = useRef<number | null>(null);
-  const isMountedRef = useRef(true); // For mounted check
+  const isMountedRef = useRef(true);
+
+  const [confirmDeleteProjectId, setConfirmDeleteProjectId] = useState<number | null>(null);
+  const confirmDeleteTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -60,6 +63,9 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         if (saveTimeoutRef.current) {
             clearTimeout(saveTimeoutRef.current);
         }
+        if (confirmDeleteTimerRef.current) { // Cleanup delete confirmation timer
+            clearTimeout(confirmDeleteTimerRef.current);
+        }
     };
   }, []);
 
@@ -67,6 +73,18 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
   useEffect(() => {
       safeSetItem('ccb_showProjectSettings', showSettings);
   }, [showSettings]);
+
+  // Effect to clear confirm delete state if selected project changes or becomes 0
+  useEffect(() => {
+    if (confirmDeleteProjectId !== null && confirmDeleteProjectId !== selectedProjectId) {
+        if (confirmDeleteTimerRef.current) {
+            clearTimeout(confirmDeleteTimerRef.current);
+            confirmDeleteTimerRef.current = null;
+        }
+        setConfirmDeleteProjectId(null);
+    }
+  }, [selectedProjectId, confirmDeleteProjectId]);
+
 
   const hasProjects = projects.length > 0;
   const projectSelected = selectedProjectId > 0;
@@ -105,7 +123,34 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         case 'saving': return 'Saving...';
         case 'saved': return 'Saved ✓';
         case 'error': return 'Save Error!';
-        default: return ''; // Return empty for 'idle' to make it truly invisible with opacity
+        default: return '';
+    }
+  };
+
+  const handleDeleteClick = () => {
+    if (!projectSelected || isScanning) return;
+
+    if (confirmDeleteProjectId === selectedProjectId) {
+        // This is the confirm click (second click on checkmark)
+        if (confirmDeleteTimerRef.current) {
+            clearTimeout(confirmDeleteTimerRef.current);
+            confirmDeleteTimerRef.current = null;
+        }
+        onDeleteProject(); // Call the prop passed from App.tsx
+        setConfirmDeleteProjectId(null); // Reset confirmation state
+    } else {
+        // This is the initial click to arm deletion, or switching target
+        if (confirmDeleteTimerRef.current) {
+            clearTimeout(confirmDeleteTimerRef.current);
+        }
+        setConfirmDeleteProjectId(selectedProjectId);
+        confirmDeleteTimerRef.current = window.setTimeout(() => {
+            if (isMountedRef.current) {
+                // Only reset if the currently selected project is still the one for which timer was set
+                setConfirmDeleteProjectId(prevId => (prevId === selectedProjectId ? null : prevId));
+            }
+            confirmDeleteTimerRef.current = null;
+        }, 2000);
     }
   };
 
@@ -130,17 +175,22 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
   if (isScanning) {
     scanButtonClasses.push('scan-btn-scanning');
   }
+  
+  const deleteButtonIcon = confirmDeleteProjectId === selectedProjectId ? '✔️' : '🗑️';
+  const deleteButtonTitle = confirmDeleteProjectId === selectedProjectId 
+    ? "Confirm Delete Project" 
+    : "Delete the selected project (click again to confirm)";
+
 
   return (
     <div className="project-manager">
-      {/* Combined row for Project Label and Save Status */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '1.2em' /* Ensure minimum height for the row */ }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '1.2em' }}>
         <label
             htmlFor="projectSelectorDropdown"
             style={{
                 fontSize: '0.9em',
                 color: 'var(--label-text-color)',
-                marginBottom: '0' /* Override global label margin */
+                marginBottom: '0'
             }}
         >
           Project:
@@ -148,15 +198,12 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         {projectSelected && (
           <span
             className={`save-status ${saveStatus} ${saveStatus !== 'idle' ? 'visible' : ''}`}
-            // Inline styles for min-width, text-align, display are removed
-            // and will be handled by the CSS class.
           >
             {getSaveStatusMessage()}
           </span>
         )}
       </div>
 
-      {/* Project selection dropdown */}
       <div className="pm-row-select">
         <select
           id="projectSelectorDropdown"
@@ -174,17 +221,22 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         </select>
       </div>
 
-      {/* Row for action buttons (New, Delete, Settings, Scan) */}
       <div className="pm-row-buttons">
         <div className="pm-buttons-group-left">
           <button onClick={onCreateProject} disabled={isScanning} title="Create a new project">➕</button>
-          <button onClick={onDeleteProject} disabled={!projectSelected || isScanning} title="Delete the selected project">🗑️</button>
+          <button 
+            onClick={handleDeleteClick} 
+            disabled={!projectSelected || isScanning} 
+            title={deleteButtonTitle}
+          >
+            {deleteButtonIcon}
+          </button>
           <button
               onClick={() => setShowSettings(!showSettings)}
               disabled={isScanning || !projectSelected}
               title={showSettings ? "Hide Project Settings" : "Show Project Settings"}
           >
-            {showSettings ? '⚙️' : '⚙️'}
+            {showSettings ? '⚙️' : '⚙️'} 
           </button>
         </div>
         <button
@@ -197,7 +249,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         </button>
       </div>
 
-      {/* Conditional display of Project Settings Form */}
       {showSettings && projectSelected && (
         <ProjectManagerForm
           projectTitle={projectTitle}

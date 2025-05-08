@@ -16,7 +16,6 @@ import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { Window, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
 import { findNodeByPath as findNodeByPathUtil } from "./components/CodeContextBuilder/FileTree/fileTreeUtils";
 
-
 // ... (existing interfaces and helper functions: ScanProgressPayload, MonitoredFile, debounce, getAllFilePaths, getMonitorableFilesFromTree, TreeStats, calculateTreeStats) ...
 interface ScanProgressPayload {
     progress: number;
@@ -436,15 +435,29 @@ function App() {
     }, [loadProjects]);
 
     const handleDeleteCurrentProject = useCallback(async () => {
-        if (typeof invoke !== 'function') { if (isMountedRef.current) setError("Cannot delete: API not ready."); return; }
-        const projectToDelete = projects.find(p => p.id === selectedProjectId);
-        if (!selectedProjectId || !projectToDelete || !confirm(`Delete project "${projectToDelete.title}"? This cannot be undone.`)) return;
+        // Confirmation is now handled in ProjectManager.tsx before this is called.
+        if (typeof invoke !== 'function') { 
+            if (isMountedRef.current) setError("Cannot delete: API not ready."); 
+            return; 
+        }
+        // `selectedProjectId` is assumed to be valid and > 0 because ProjectManager
+        // would disable the delete button or prevent calling this otherwise.
+
         try {
             await invoke("delete_code_context_builder_project", { projectId: selectedProjectId });
-            localStorage.removeItem(`ccb_treeData_${selectedProjectId}`); localStorage.removeItem(`ccb_selectedPaths_${selectedProjectId}`); localStorage.removeItem(`ccb_expandedPaths_${selectedProjectId}`);
-            if (isMountedRef.current) await loadProjects();
-        } catch (err) { if (isMountedRef.current) setError(`Delete failed: ${err instanceof Error ? err.message : String(err)}`); }
-    }, [selectedProjectId, projects, loadProjects]);
+            localStorage.removeItem(`ccb_treeData_${selectedProjectId}`); 
+            localStorage.removeItem(`ccb_selectedPaths_${selectedProjectId}`); 
+            localStorage.removeItem(`ccb_expandedPaths_${selectedProjectId}`);
+            if (isMountedRef.current) {
+                 await loadProjects(); // Reload projects, which will update selection or show no projects.
+            }
+        } catch (err) { 
+            console.error("Error during delete process:", err);
+            if (isMountedRef.current) {
+                setError(`Delete process failed: ${err instanceof Error ? err.message : String(err)}`);
+            }
+        }
+    }, [selectedProjectId, loadProjects]); // projects dependency removed as projectToDelete lookup is no longer here.
 
     const handleScanProject = useCallback(async () => {
         if (!selectedProjectId || isScanning || typeof invoke !== 'function') {
