@@ -1,3 +1,4 @@
+
 // src/App.tsx
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -70,9 +71,9 @@ const getMonitorableFilesFromTree = (node: FileNode | null): Record<string, Moni
     const files: Record<string, MonitoredFile> = {};
     function traverse(currentNode: FileNode) {
         if (!currentNode.is_dir) {
-            files[currentNode.path] = { 
-                last_modified: currentNode.last_modified, 
-                size: currentNode.size 
+            files[currentNode.path] = {
+                last_modified: currentNode.last_modified,
+                size: currentNode.size
             };
         }
         if (currentNode.children) {
@@ -121,7 +122,7 @@ function App() {
     const isMountedRef = useRef(true);
 
     const [projects, setProjects] = useState<Project[]>([]);
-    const [selectedProjectId, setSelectedProjectId] = useState<number>(0); 
+    const [selectedProjectId, setSelectedProjectId] = useState<number>(0);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -142,15 +143,16 @@ function App() {
     const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState<boolean>(() => {
         try { return localStorage.getItem('ccb_isLeftPanelCollapsed') === 'true'; } catch { return false; }
     });
-    const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState<boolean>(false); 
-    const [outOfDateFilePaths, setOutOfDateFilePaths] = useState<Set<string>>(new Set()); 
+    const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState<boolean>(false);
+    const [outOfDateFilePaths, setOutOfDateFilePaths] = useState<Set<string>>(new Set());
 
     const [showGlobalCopySuccess, setShowGlobalCopySuccess] = useState<boolean>(false);
     const globalCopySuccessTimerRef = useRef<number | null>(null);
-    const fileTreeRef = useRef<FileTreeRefHandles>(null); 
+    const fileTreeRef = useRef<FileTreeRefHandles>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null); // Ref for the search input in App.tsx
 
 
-    const prevProjectId = useRef<number | null>(null); 
+    const prevProjectId = useRef<number | null>(null);
 
     const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
 
@@ -191,7 +193,7 @@ function App() {
         const mainWindowRef = { current: null as Window | null };
         let unlistenMove: UnlistenFn | undefined;
         let unlistenResize: UnlistenFn | undefined;
-    
+
         const restoreWindowGeometry = async () => {
             try {
                 const mainWin = await Window.getByLabel('main');
@@ -200,7 +202,7 @@ function App() {
                     return;
                 }
                 mainWindowRef.current = mainWin;
-        
+
                 const savedGeometryStr = localStorage.getItem(WINDOW_GEOMETRY_KEY);
                 if (savedGeometryStr) {
                     const savedGeometry: WindowGeometry = JSON.parse(savedGeometryStr);
@@ -208,7 +210,7 @@ function App() {
                         typeof savedGeometry.y === 'number' &&
                         typeof savedGeometry.width === 'number' && savedGeometry.width > 0 &&
                         typeof savedGeometry.height === 'number' && savedGeometry.height > 0) {
-                        
+
                         await mainWin.setPosition(new PhysicalPosition(savedGeometry.x, savedGeometry.y));
                         await mainWin.setSize(new PhysicalSize(savedGeometry.width, savedGeometry.height));
                     }
@@ -226,11 +228,11 @@ function App() {
                 }
             }
         };
-    
+
         const saveCurrentWindowGeometry = async () => {
             const mainWin = mainWindowRef.current;
              if (!localIsMountedRef.current || !mainWin) return;
-    
+
             try {
                 if (await mainWin.isMinimized() || await mainWin.isMaximized() || !(await mainWin.isVisible())) {
                     return;
@@ -248,11 +250,11 @@ function App() {
                 console.error('Failed to save window geometry:', error);
             }
         };
-    
+
         const debouncedSaveGeometry = debounce(saveCurrentWindowGeometry, 500);
-    
+
         const setupListeners = async () => {
-            await restoreWindowGeometry(); 
+            await restoreWindowGeometry();
             if (!localIsMountedRef.current) return;
             const mainWin = mainWindowRef.current;
             if (mainWin) {
@@ -260,9 +262,9 @@ function App() {
                 unlistenMove = await mainWin.onMoved(debouncedSaveGeometry);
             }
         };
-    
+
         setupListeners().catch(err => console.error("Error in window geometry setupListeners:", err));
-    
+
         return () => {
             localIsMountedRef.current = false;
             unlistenResize?.();
@@ -276,47 +278,47 @@ function App() {
     const [isMonitoringProject, setIsMonitoringProject] = useState<number | null>(null);
 
     const stopFileMonitoring = useCallback(async () => {
-        if (isMonitoringProject !== null) { 
+        if (isMonitoringProject !== null) {
             try {
                 await invoke("stop_monitoring_project_cmd");
                 if (isMountedRef.current) {
                     setIsMonitoringProject(null);
-                    setOutOfDateFilePaths(new Set()); 
+                    setOutOfDateFilePaths(new Set());
                 }
             } catch (err) {
                 // console.error("[App Monitor] Failed to stop file monitoring for project " + isMonitoringProject + ":", err);
             }
         }
-    }, [isMonitoringProject]); 
+    }, [isMonitoringProject]);
 
     const startFileMonitoring = useCallback(async (projectId: number, currentTreeData: FileNode | null) => {
-        await stopFileMonitoring(); 
-        
+        await stopFileMonitoring();
+
         if (!isMountedRef.current) return;
 
         if (projectId > 0 && currentTreeData) {
             const filesToMonitorMap = getMonitorableFilesFromTree(currentTreeData);
             if (Object.keys(filesToMonitorMap).length > 0) {
                 try {
-                    const payload = { projectId, filesToMonitor: filesToMonitorMap }; 
+                    const payload = { projectId, filesToMonitor: filesToMonitorMap };
                     await invoke("start_monitoring_project_cmd", payload);
                     if (isMountedRef.current) {
                         setIsMonitoringProject(projectId);
-                        setOutOfDateFilePaths(new Set()); 
+                        setOutOfDateFilePaths(new Set());
                     }
                 } catch (err) {
                     // console.error("[App Monitor] Failed to start file monitoring for project " + projectId + ":", err);
-                    if (isMountedRef.current) setIsMonitoringProject(null); 
+                    if (isMountedRef.current) setIsMonitoringProject(null);
                 }
             } else {
-                if (isMountedRef.current) setIsMonitoringProject(null); 
+                if (isMountedRef.current) setIsMonitoringProject(null);
             }
         } else {
-            if (isMountedRef.current) setIsMonitoringProject(null); 
+            if (isMountedRef.current) setIsMonitoringProject(null);
         }
     }, [stopFileMonitoring]);
 
-    
+
     useEffect(() => {
         if (selectedProjectId > 0 && treeData) {
             startFileMonitoring(selectedProjectId, treeData);
@@ -324,7 +326,7 @@ function App() {
             stopFileMonitoring();
         }
     }, [selectedProjectId, treeData, startFileMonitoring, stopFileMonitoring]);
-    
+
     useEffect(() => {
         const localIsMountedRef = { current: true };
         let unlistenFreshness: UnlistenFn | undefined;
@@ -356,11 +358,11 @@ function App() {
                 throw new Error("Tauri API 'invoke' not ready.");
             }
             const loadedProjects = await invoke<Project[]>("list_code_context_builder_projects");
-            
+
             if (!isMountedRef.current) return;
 
             setProjects(loadedProjects);
-            
+
             let projectToSelect = 0;
             const lastSelectedIdStr = localStorage.getItem('ccb_lastSelectedProjectId');
             const lastSelectedIdNumFromStorage = lastSelectedIdStr ? parseInt(lastSelectedIdStr, 10) : 0;
@@ -381,11 +383,11 @@ function App() {
                 setProjects([]);
                 setSelectedProjectId(0);
             }
-            localStorage.removeItem('ccb_lastSelectedProjectId'); 
+            localStorage.removeItem('ccb_lastSelectedProjectId');
         } finally {
             if (isMountedRef.current) setIsLoading(false);
         }
-    }, []); 
+    }, []);
 
     useEffect(() => {
         const localIsMountedRef = { current: true };
@@ -395,21 +397,19 @@ function App() {
             }
         });
         return () => { localIsMountedRef.current = false; };
-    }, [loadProjects]); 
+    }, [loadProjects]);
 
     useEffect(() => {
         const project = projects.find(p => p.id === selectedProjectId);
 
-        // This effect primarily deals with synchronous state updates based on selectedProjectId.
-        // No direct async operations leading to state updates here that need `isMountedRef`.
-        if (prevProjectId.current !== selectedProjectId) { 
+        if (prevProjectId.current !== selectedProjectId) {
             setEditableTitle(project?.title || "");
             setEditableRootFolder(project?.root_folder || "");
             setEditableIgnorePatterns(project?.ignore_patterns?.join("\n") || "");
 
             if (selectedProjectId > 0) {
                 localStorage.setItem('ccb_lastSelectedProjectId', selectedProjectId.toString());
-                
+
                 const storedTreeJson = localStorage.getItem(`ccb_treeData_${selectedProjectId}`);
                 let loadedTree: FileNode | null = null;
                 if (storedTreeJson) {
@@ -431,17 +431,18 @@ function App() {
                 if (prevProjectId.current !== null && prevProjectId.current > 0) {
                     localStorage.removeItem('ccb_lastSelectedProjectId');
                 }
-                 setTreeData(null); 
+                 setTreeData(null);
                  setSelectedPaths(new Set());
                  setExpandedPaths(new Set());
             }
-            setSearchTerm("");
+            setSearchTerm(""); // Clear search term when project changes
             setViewingFilePath(null);
+            fileTreeRef.current?.clearSearchState(); // Clear internal FileTree search state
         }
-        
+
         prevProjectId.current = selectedProjectId;
 
-    }, [selectedProjectId, projects]); 
+    }, [selectedProjectId, projects]);
 
     useEffect(() => {
         if (selectedProjectId > 0) {
@@ -486,14 +487,14 @@ function App() {
                             setError(`Scan ${status}`);
                         }
                         if (status === 'done') {
-                            setOutOfDateFilePaths(new Set()); 
+                            setOutOfDateFilePaths(new Set());
                         }
                     }
                 });
-            } catch (err) { 
+            } catch (err) {
                 if(localIsMountedRef.current && isMountedRef.current) {
-                    console.error("[APP] Failed to set up scan listeners:", err); 
-                    setError(`Listener setup failed: ${err instanceof Error ? err.message : String(err)}`); 
+                    console.error("[APP] Failed to set up scan listeners:", err);
+                    setError(`Listener setup failed: ${err instanceof Error ? err.message : String(err)}`);
                 }
             }
         };
@@ -503,7 +504,7 @@ function App() {
             unlistenProgress?.();
             unlistenComplete?.();
         };
-    }, []); 
+    }, []);
 
     useEffect(() => {
        const storedState = localStorage.getItem('ccb_scanState');
@@ -532,9 +533,9 @@ function App() {
 
     // --- Project CRUD Handlers ---
     const handleSaveCurrentProject = useCallback(async () => {
-        if (!selectedProjectId || typeof invoke !== 'function') { 
+        if (!selectedProjectId || typeof invoke !== 'function') {
             if (isMountedRef.current) setError("Cannot save: No project selected or API not ready.");
-            return "no_project"; 
+            return "no_project";
         }
         const currentTitle = editableTitle.trim() || "Untitled Project";
         const currentRootFolder = editableRootFolder.trim() || null;
@@ -550,7 +551,7 @@ function App() {
             await invoke("save_code_context_builder_project", { project: projectToSave });
             if (!isMountedRef.current) return "error"; // Or some other status indicating unmounted
 
-            setProjects(prevProjects => { 
+            setProjects(prevProjects => {
                 const newUpdatedAt = new Date().toISOString();
                 return prevProjects.map(p => {
                     if (p.id === selectedProjectId) {
@@ -562,7 +563,7 @@ function App() {
                             title: currentTitle,
                             root_folder: currentRootFolder,
                             ignore_patterns: currentIgnoreArr,
-                            updated_at: newUpdatedAt, 
+                            updated_at: newUpdatedAt,
                         };
                     }
                     return p;
@@ -570,21 +571,21 @@ function App() {
             });
             return "saved";
         }
-        catch (err) { 
+        catch (err) {
             if (isMountedRef.current) setError(`Save failed: ${err instanceof Error ? err.message : String(err)}`);
-            return "error"; 
+            return "error";
         }
     }, [selectedProjectId, editableTitle, editableRootFolder, editableIgnorePatterns]);
 
     const handleCreateNewProject = useCallback(async () => {
         if (typeof invoke !== 'function') {
-            if (isMountedRef.current) setError("Cannot create: API not ready."); 
-            return; 
+            if (isMountedRef.current) setError("Cannot create: API not ready.");
+            return;
         }
         const newTitle = prompt("Enter new project title:");
         if (newTitle && newTitle.trim()) {
              const DEFAULT_IGNORE = [ "*.test.*", "*.spec.*", "node_modules", ".git", "/venv/", ".godot", "/public/", ".next", ".vscode", ".venv", "pgsql", "*__pycache__", ".gitignore", "*.ps1", "*.vbs", ".python-version", "uv.lock", "pyproject.toml", "/dist/", "/assets/", ".exe", "pycache", ".csv", ".env", "*package-lock.json", "*.code-workspace", "/target/","/gen/"];
-            const newProjectData: Partial<Omit<Project, 'id' | 'updated_at'>> = { 
+            const newProjectData: Partial<Omit<Project, 'id' | 'updated_at'>> = {
                 title: newTitle.trim(),
                 root_folder: null,
                 ignore_patterns: DEFAULT_IGNORE
@@ -593,16 +594,16 @@ function App() {
                 const newId = await invoke<number>("save_code_context_builder_project", { project: newProjectData });
                 if (isMountedRef.current) await loadProjects(newId);
             }
-            catch (err) { 
-                if (isMountedRef.current) setError(`Create failed: ${err instanceof Error ? err.message : String(err)}`); 
+            catch (err) {
+                if (isMountedRef.current) setError(`Create failed: ${err instanceof Error ? err.message : String(err)}`);
             }
         }
-    }, [loadProjects]); 
+    }, [loadProjects]);
 
     const handleDeleteCurrentProject = useCallback(async () => {
-        if (typeof invoke !== 'function') { 
-            if (isMountedRef.current) setError("Cannot delete: API not ready."); 
-            return; 
+        if (typeof invoke !== 'function') {
+            if (isMountedRef.current) setError("Cannot delete: API not ready.");
+            return;
         }
         const projectToDelete = projects.find(p => p.id === selectedProjectId);
         if (!selectedProjectId || !projectToDelete || !confirm(`Delete project "${projectToDelete.title}"? This cannot be undone.`)) { return; }
@@ -611,12 +612,12 @@ function App() {
             localStorage.removeItem(`ccb_treeData_${selectedProjectId}`);
             localStorage.removeItem(`ccb_selectedPaths_${selectedProjectId}`);
             localStorage.removeItem(`ccb_expandedPaths_${selectedProjectId}`);
-            if (isMountedRef.current) await loadProjects(); 
+            if (isMountedRef.current) await loadProjects();
         }
-        catch (err) { 
-            if (isMountedRef.current) setError(`Delete failed: ${err instanceof Error ? err.message : String(err)}`); 
+        catch (err) {
+            if (isMountedRef.current) setError(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
         }
-    }, [selectedProjectId, projects, loadProjects]); 
+    }, [selectedProjectId, projects, loadProjects]);
 
     // --- Scan Handlers ---
     const handleScanProject = useCallback(async () => {
@@ -625,7 +626,7 @@ function App() {
             return;
         }
         if(isMonitoringProject === selectedProjectId) {
-            await stopFileMonitoring(); // stopFileMonitoring has its own mounted checks for its state setters
+            await stopFileMonitoring();
        }
 
        if (!isMountedRef.current) return;
@@ -633,20 +634,21 @@ function App() {
        setScanProgressPct(0);
        setCurrentScanPath("Initiating scan...");
        setError(null);
-       setSearchTerm(""); 
-       setOutOfDateFilePaths(new Set()); 
+       setSearchTerm(""); // Clear search term before scan
+       setOutOfDateFilePaths(new Set());
+       fileTreeRef.current?.clearSearchState(); // Clear internal FileTree search state
 
        try {
            const result = await invoke<FileNode>("scan_code_context_builder_project", { projectId: selectedProjectId });
            if (!isMountedRef.current) return;
-           setTreeData(result); 
+           setTreeData(result);
            localStorage.setItem(`ccb_treeData_${selectedProjectId}`, JSON.stringify(result));
            setProjects(prev => prev.map(p => p.id === selectedProjectId ? {...p, updated_at: new Date().toISOString()} : p));
         } catch (err) {
             console.error("[APP] Scan invocation failed:", err);
             if (!isMountedRef.current) return;
             setError(`Scan failed: ${err instanceof Error ? err.message : String(err)}`);
-            setTreeData(null); 
+            setTreeData(null);
             localStorage.removeItem(`ccb_treeData_${selectedProjectId}`);
         }
     }, [selectedProjectId, isScanning, stopFileMonitoring, isMonitoringProject ]);
@@ -658,11 +660,10 @@ function App() {
         } catch (err) {
            if (isMountedRef.current) setError(`Failed to cancel scan: ${err instanceof Error ? err.message : String(err)}`);
         }
-    }, [isScanning]); 
+    }, [isScanning]);
 
     // --- Selection & Expansion Handlers ---
     const handleToggleSelection = useCallback((path: string, isDir: boolean) => {
-        // Synchronous state update, no direct async issue here.
         setSelectedPaths(prevSelectedPaths => {
             const newSelectedPaths = new Set(prevSelectedPaths);
             const node = findNodeByPathUtil(treeData, path);
@@ -685,7 +686,6 @@ function App() {
     }, [treeData]);
 
      const handleToggleExpand = useCallback((path: string) => {
-         // Synchronous state update
          setExpandedPaths(prevExpanded => {
              const newExpanded = new Set(prevExpanded);
              if (newExpanded.has(path)) {
@@ -699,11 +699,9 @@ function App() {
 
     // --- Modal Handlers ---
     const handleViewFile = useCallback((path: string) => {
-        // Synchronous state update
         setViewingFilePath(path);
     }, []);
     const handleCloseModal = useCallback(() => {
-        // Synchronous state update
         setViewingFilePath(null);
     }, []);
 
@@ -718,32 +716,32 @@ function App() {
 
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
             event.preventDefault();
-            fileTreeRef.current?.focusSearchInput();
+            searchInputRef.current?.focus(); // Focus the search input in App.tsx
         } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'C') {
             event.preventDefault();
             window.dispatchEvent(new CustomEvent('hotkey-copy-aggregated'));
         } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'R') {
             event.preventDefault();
             if (selectedProjectId > 0 && !isScanning) {
-                handleScanProject(); // This is async and has mounted checks
+                handleScanProject();
             }
         } else if (event.ctrlKey && event.key.toLowerCase() === 'a' && !isInputFocused) {
             event.preventDefault();
-            if (treeData && isMountedRef.current) { // Check mount for setSelectedPaths
+            if (treeData && isMountedRef.current) {
                 const allFiles = getAllFilePaths(treeData);
                 setSelectedPaths(new Set(allFiles));
             }
         } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'A' && !isInputFocused) {
             event.preventDefault();
             if (isMountedRef.current) setSelectedPaths(new Set());
-        } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'X' && !isInputFocused) { 
+        } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'X' && !isInputFocused) {
             event.preventDefault();
             if (isMountedRef.current) setSelectedPaths(new Set());
-        } else if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 'x' && !isInputFocused) { 
+        } else if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 'x' && !isInputFocused) {
             event.preventDefault();
             if (isMountedRef.current) setSelectedPaths(new Set());
         }
-    }, [treeData, selectedProjectId, isScanning, handleScanProject, fileTreeRef]); 
+    }, [treeData, selectedProjectId, isScanning, handleScanProject, searchInputRef]); // Added searchInputRef
 
     useEffect(() => {
         window.addEventListener('keydown', handleGlobalKeyDown);
@@ -751,17 +749,36 @@ function App() {
             window.removeEventListener('keydown', handleGlobalKeyDown);
         };
     }, [handleGlobalKeyDown]);
-    
+
     const treeStats = useMemo(() => calculateTreeStats(treeData), [treeData]);
 
     useEffect(() => {
-        // This is the main component unmount effect.
-        // isMountedRef will be set to false by its own dedicated effect.
-        // stopFileMonitoring is called to clean up Tauri-side resources.
         return () => {
-            stopFileMonitoring(); 
+            stopFileMonitoring();
         };
     }, [stopFileMonitoring]);
+
+    // Handler for search input keydown events in App.tsx
+    const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            setSearchTerm(""); // Clear search term in App state
+            fileTreeRef.current?.clearSearchState(); // Clear highlightedIndex in FileTree
+            searchInputRef.current?.blur();
+        } else if (['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+            e.preventDefault(); // Prevent default browser action (e.g., page scroll, form submission)
+            // Delegate these specific key events to the FileTree component
+            fileTreeRef.current?.handleSearchKeyDown(e);
+        }
+        // For other keys (alphanumeric, backspace, etc.), let the input handle them naturally for typing
+        // No specific action needed here as onChange already updates searchTerm
+    };
+
+    const handleClearSearch = () => {
+        setSearchTerm("");
+        fileTreeRef.current?.clearSearchState();
+        searchInputRef.current?.focus();
+    };
 
 
     return (
@@ -774,7 +791,7 @@ function App() {
             {viewingFilePath && (
                 <FileViewerModal filePath={viewingFilePath} onClose={handleCloseModal} />
             )}
-            {isHotkeysModalOpen && ( 
+            {isHotkeysModalOpen && (
                 <HotkeysModal isOpen={isHotkeysModalOpen} onClose={handleCloseHotkeysModal} />
             )}
             {isScanning && (
@@ -802,28 +819,27 @@ function App() {
                                 projects={projects}
                                 selectedProjectId={selectedProjectId}
                                 onProjectSelect={(id) => {
-                                    // Synchronous state update
-                                    if (isMountedRef.current) setSelectedProjectId(id); 
+                                    if (isMountedRef.current) setSelectedProjectId(id);
                                 }}
                                 projectTitle={editableTitle}
-                                setProjectTitle={setEditableTitle} // Synchronous, managed by ProjectManager too
+                                setProjectTitle={setEditableTitle}
                                 rootFolder={editableRootFolder}
-                                setRootFolder={setEditableRootFolder} // Synchronous
+                                setRootFolder={setEditableRootFolder}
                                 ignoreText={editableIgnorePatterns}
-                                setIgnoreText={setEditableIgnorePatterns} // Synchronous
-                                onSaveProject={handleSaveCurrentProject} // Async, has mounted checks
-                                onCreateProject={handleCreateNewProject} // Async, has mounted checks
-                                onDeleteProject={handleDeleteCurrentProject} // Async, has mounted checks
-                                onScanProject={handleScanProject} // Async, has mounted checks
+                                setIgnoreText={setEditableIgnorePatterns}
+                                onSaveProject={handleSaveCurrentProject}
+                                onCreateProject={handleCreateNewProject}
+                                onDeleteProject={handleDeleteCurrentProject}
+                                onScanProject={handleScanProject}
                                 isScanning={isScanning}
-                                outOfDateFileCount={outOfDateFilePaths.size} 
+                                outOfDateFileCount={outOfDateFilePaths.size}
                             />
                         )}
                     </div>
                     <div className="left-panel-aggregator">
-                    <Aggregator 
-                            selectedPaths={selectedPaths} 
-                            treeData={treeData} 
+                    <Aggregator
+                            selectedPaths={selectedPaths}
+                            treeData={treeData}
                             selectedProjectId={selectedProjectId > 0 ? selectedProjectId : null}
                         />
                     </div>
@@ -831,33 +847,49 @@ function App() {
 
                 <div className="file-tree-main-content">
                      <div className="file-tree-header">
-                        <button 
+                        <button
                             className="collapse-toggle-btn"
-                            onClick={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)} // Synchronous
+                            onClick={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
                             title={isLeftPanelCollapsed ? "Show Left Panel" : "Hide Left Panel"}
                         >
                             {isLeftPanelCollapsed ? '▶' : '◀'}
                         </button>
                         <h3>File Explorer {isScanning && <span className="header-scanning-indicator">(Scanning...)</span>}</h3>
-                        <button 
-                            onClick={handleOpenHotkeysModal} // Synchronous
-                            title="View Keyboard Shortcuts" 
+                        {/* Search elements moved here */}
+                        <div className="file-tree-search-controls">
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                placeholder="Search (Ctrl+F)..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)} // This updates the searchTerm state
+                                onKeyDown={handleSearchInputKeyDown} // This handles Escape, Arrows, Enter
+                            />
+                            <button onClick={(e) => fileTreeRef.current?.expandTreeLevel(e.ctrlKey || e.metaKey)} title="Expand Level (Ctrl+Click for All)">▼</button>
+                            <button onClick={(e) => fileTreeRef.current?.collapseTreeLevel(e.ctrlKey || e.metaKey)} title="Collapse Level (Ctrl+Click for All)">▲</button>
+                            {searchTerm && (
+                                <button onClick={handleClearSearch} title="Clear Search (Esc)">✕</button>
+                            )}
+                        </div>
+                        <button
+                            onClick={handleOpenHotkeysModal}
+                            title="View Keyboard Shortcuts"
                             className="hotkeys-help-btn"
                         >
                             ?
                         </button>
                     </div>
                     <FileTree
-                        ref={fileTreeRef} 
+                        ref={fileTreeRef}
                         treeData={treeData}
                         selectedPaths={selectedPaths}
-                        onToggleSelection={handleToggleSelection} // Synchronous wrapper for setSelectedPaths
+                        onToggleSelection={handleToggleSelection}
                         searchTerm={searchTerm}
-                        onSearchTermChange={setSearchTerm} // Synchronous
-                        onViewFile={handleViewFile} // Synchronous wrapper for setViewingFilePath
+                        // onSearchTermChange is now handled by App.tsx directly for the input
+                        onViewFile={handleViewFile}
                         expandedPaths={expandedPaths}
-                        onToggleExpand={handleToggleExpand} // Synchronous wrapper for setExpandedPaths
-                        outOfDateFilePaths={outOfDateFilePaths} 
+                        onToggleExpand={handleToggleExpand}
+                        outOfDateFilePaths={outOfDateFilePaths}
                     />
                     {!treeData && selectedProjectId > 0 && !isScanning && !isLoading && (
                         <div style={{ padding: '1em', color: '#aaa', fontStyle: 'italic', textAlign: 'center', marginTop: '2em' }}>
@@ -878,7 +910,7 @@ function App() {
             <StatusBar
                 stats={treeStats}
                 lastScanTime={selectedProject?.updated_at}
-                outOfDateFileCount={outOfDateFilePaths.size} 
+                outOfDateFileCount={outOfDateFilePaths.size}
             />
         </div>
     );

@@ -1,8 +1,5 @@
-
-
-
-
 // src/hooks/useAggregator.ts
+
 import { useState, useEffect, useCallback, useRef } from 'react'; // Added useRef
 import { invoke } from '@tauri-apps/api/core';
 import { FileNode } from '../types/scanner';

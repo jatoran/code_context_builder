@@ -1,33 +1,30 @@
-
 // src/components/CodeContextBuilder/FileTree/FileTreeNode.tsx
 
 import React, { useMemo, useCallback } from "react";
-import { FileNode } from '../../../types/scanner'; 
+import { FileNode } from '../../../types/scanner';
 import {
     getAllDescendantFilePaths,
     nodeOrDescendantMatches,
     formatTimeAgo,
-    // getDescendantFileStats, // No longer needed for displaying base folder stats
-    // DescendantStats // No longer needed for displaying base folder stats
 } from './fileTreeUtils';
 
 interface FileTreeNodeProps {
     node: FileNode;
-    selectedPaths: Set<string>; 
+    selectedPaths: Set<string>;
     onToggleSelection: (path: string, isDir: boolean) => void;
     level: number;
     searchTerm: string;
     onViewFile: (path: string) => void;
     expandedPaths: Set<string>;
     onToggleExpand: (path: string) => void;
-    highlightedPath?: string;
-    outOfDateFilePaths: Set<string>; 
+    highlightedPath?: string; // This prop indicates the path of the search-focused item
+    outOfDateFilePaths: Set<string>;
 }
 
 
 const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
     node,
-    selectedPaths, 
+    selectedPaths,
     onToggleSelection,
     level,
     searchTerm,
@@ -35,24 +32,24 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
     expandedPaths,
     onToggleExpand,
     highlightedPath,
-    outOfDateFilePaths, 
+    outOfDateFilePaths,
 }) => {
 
-     const lowerSearchTerm = searchTerm.toLowerCase();
-     const doesNodeMatchSearch = useMemo(() =>
-         searchTerm ? node.name.toLowerCase().includes(lowerSearchTerm) : false,
-         [node.name, lowerSearchTerm, searchTerm]
-     );
-     const isVisible = useMemo(() =>
-         nodeOrDescendantMatches(node, searchTerm), 
-         [node, searchTerm]
-     );
-     
-     const isOpen = useMemo(() => {
-         const isExplicitlyExpanded = expandedPaths.has(node.path);
-         const isSearchForcedOpen = !!searchTerm && isVisible && node.is_dir;
-         return isExplicitlyExpanded || isSearchForcedOpen;
-     }, [expandedPaths, node.path, searchTerm, isVisible, node.is_dir]);
+    // All hooks should be called before any conditional returns.
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    const doesNodeMatchSearch = useMemo(() =>
+        searchTerm ? node.name.toLowerCase().includes(lowerSearchTerm) : false,
+        [node.name, lowerSearchTerm, searchTerm]
+    );
+    const isVisible = useMemo(() =>
+        nodeOrDescendantMatches(node, searchTerm),
+        [node, searchTerm]
+    );
+    const isOpen = useMemo(() => {
+        const isExplicitlyExpanded = expandedPaths.has(node.path);
+        const isSearchForcedOpen = !!searchTerm && isVisible && node.is_dir;
+        return isExplicitlyExpanded || isSearchForcedOpen;
+    }, [expandedPaths, node.path, searchTerm, isVisible, node.is_dir]);
 
     const handleToggleOpen = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
@@ -68,19 +65,18 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
 
     const handleNameClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!node.is_dir && e.shiftKey) {
-            e.preventDefault();
-            onViewFile(node.path);
+        if (node.is_dir) {
+            onToggleExpand(node.path);
         } else {
-            // For directories, clicking the name should also toggle expansion if it's not just about selection
-            // If you want name click to ONLY select/deselect, remove the onToggleExpand part for dirs
-            if (node.is_dir) {
-                onToggleExpand(node.path); 
+            if (e.shiftKey) {
+                e.preventDefault();
+                onViewFile(node.path);
+            } else {
+                onToggleSelection(node.path, false);
             }
-            onToggleSelection(node.path, node.is_dir);
         }
-    }, [node, onToggleSelection, onViewFile, onToggleExpand]); // Added node and onToggleExpand
-    
+    }, [node, onToggleSelection, onViewFile, onToggleExpand]);
+
     const descendantFilePaths = useMemo(() => {
         if (node.is_dir) {
             return getAllDescendantFilePaths(node);
@@ -97,70 +93,62 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
         if (!node.is_dir) {
             return selectedPaths.has(node.path) ? 'checked' : 'unchecked';
         }
-        
         const totalDescendantFiles = descendantFilePaths.length;
-
-        if (totalDescendantFiles === 0 && node.children && node.children.length > 0) { 
-            // This case is for a directory that contains only other empty directories.
-            // It has children, but no actual files to select/count.
-            return 'none'; // Or 'unchecked' if you prefer it to be selectable for some reason
+        if (totalDescendantFiles === 0 && node.children && node.children.length > 0) {
+            return 'none';
         }
-        if (totalDescendantFiles === 0) return 'none'; // Directory with no files at all
-
-
+        if (totalDescendantFiles === 0) return 'none';
         if (selectedDescendantCount === 0) return 'unchecked';
         if (selectedDescendantCount === totalDescendantFiles) return 'checked';
         return 'indeterminate';
+    }, [node, selectedPaths, descendantFilePaths, selectedDescendantCount]);
 
-    }, [node, selectedPaths, descendantFilePaths, selectedDescendantCount]); 
-
-    // REMOVED: folderStats calculation using getDescendantFileStats.
-    // We will now directly use node.lines and node.tokens for directories.
-    // const folderStats: DescendantStats | null = useMemo(() => {
-    //     if (node.is_dir && isOpen) { // Calculate only for open directories
-    //         return getDescendantFileStats(node);
-    //     }
-    //     return null;
-    // }, [node, isOpen]);
-
-    const isNodeStale = useMemo(() => 
+    const isNodeStale = useMemo(() =>
         !node.is_dir && outOfDateFilePaths.has(node.path),
     [node, outOfDateFilePaths]);
 
     const hasStaleDescendants = useMemo(() => {
-        if (!node.is_dir) return false; // Only check for directories
-        // If it's collapsed, we can't visually see stale descendants within it directly,
-        // but the backend `FileNode` for the directory itself doesn't carry a "contains_stale_child" flag.
-        // For visual cue on the folder itself when collapsed, this check needs to happen
-        // regardless of isOpen if we want to style the folder icon/name.
-        // However, if `outOfDateFilePaths` contains the folder's own path (if folders could be stale), it's different.
-        // Let's assume for now this is about files *within* an open folder for visual cues.
-        // If we want a cue on a collapsed folder *if it contains* stale files, this logic would need
-        // to run on its children data even if not visibly rendered.
-        // For now, let's keep it tied to `isOpen` for performance, or remove isOpen dependency if
-        // a persistent stale marker on closed folders is desired.
-        // For simplicity, let's assume the 'dir-contains-stale' class is primarily for when it's open.
-        // If we need it for closed folders, we'd iterate node.children here.
-        // The backend FileNode for the directory itself does not have a "contains_stale_children" flag.
-        // We use getAllDescendantFilePaths to check this.
+        if (!node.is_dir) return false;
         if (node.children && node.children.length > 0) {
-            const filesToCheck = getAllDescendantFilePaths(node); // Check all descendants
+            const filesToCheck = getAllDescendantFilePaths(node);
             return filesToCheck.some(path => outOfDateFilePaths.has(path));
         }
         return false;
     }, [node, outOfDateFilePaths]);
 
+    const nameTitle = useMemo(() => {
+        let actionText = '';
+        if (node.is_dir) {
+            actionText = '\n(Click to expand/collapse)';
+        } else {
+            actionText = '\n(Shift+Click to view, Click to select/deselect)';
+        }
+        return node.path + actionText + (isNodeStale ? '\n(File modified since last scan)' : '');
+    }, [node.path, node.is_dir, isNodeStale]);
 
+    // Conditional return now happens AFTER all hooks have been called.
     if (searchTerm && !isVisible) {
         return null;
     }
-    const isHighlighted = searchTerm.length > 0 && highlightedPath === node.path;
+
+    // Check if this node is the one actively focused by search navigation
+    const isSearchNavigationFocused = highlightedPath === node.path;
 
     const nodeClasses = ['file-tree-node'];
-    if (isHighlighted) nodeClasses.push('highlighted'); // For search term match
-    if (node.is_dir && hasStaleDescendants) nodeClasses.push('dir-contains-stale');
-    if (checkboxState === 'checked') { // For selection highlight
-        nodeClasses.push('selected');
+
+    if (isSearchNavigationFocused) {
+        nodeClasses.push('search-focused-highlight');
+    } else {
+        // Apply other highlights only if not search-navigation-focused
+        if (checkboxState === 'checked' || (checkboxState === 'indeterminate' && node.is_dir)) {
+            nodeClasses.push('selected');
+        }
+        // The general '.highlighted' class for all nodes matching search term is not used for row background
+        // to keep the 'search-focused-highlight' distinct. The '.node-name.highlight' handles text match.
+    }
+
+    if (node.is_dir && hasStaleDescendants) { // This can be combined with other states
+        nodeClasses.push('dir-contains-stale');
     }
 
 
@@ -168,7 +156,7 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
         <li
             className={`file-tree-node-li`}
             style={{ '--node-level': level } as React.CSSProperties}
-            data-file-path={node.path} 
+            data-file-path={node.path}
         >
             <div className={nodeClasses.join(' ')}>
                 {node.is_dir && node.children && node.children.length > 0 ? (
@@ -196,7 +184,9 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                 <span className="node-icon" role="img" aria-label={node.is_dir ? "Folder" : "File"}>{node.is_dir ? '📁' : '📄'}</span>
 
                 <span
-                    title={node.path + (node.is_dir ? '' : '\n(Shift+Click to view, Click to select/deselect)') + (isNodeStale ? '\n(File modified since last scan)' : '')}
+                    title={nameTitle}
+                    // Apply 'highlight' class to node-name for text snippet match,
+                    // regardless of row's search-focused or selected state.
                     className={`node-name ${doesNodeMatchSearch ? 'highlight' : ''} ${isNodeStale ? 'stale' : ''}`}
                     onClick={handleNameClick}
                 >
@@ -204,7 +194,6 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                 </span>
 
                 <span className="node-stats">
-                    {/* For Files: Show individual stats */}
                     {!node.is_dir && (
                         <>
                           {node.lines > 0 && <span className="lines">{node.lines.toLocaleString()}L</span>}
@@ -212,14 +201,12 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                           {node.last_modified && <span className="time">{formatTimeAgo(node.last_modified)}</span>}
                         </>
                     )}
-                    {/* For Directories: ALWAYS show aggregated L/T from node object itself */}
-                     {node.is_dir && (node.lines > 0 || node.tokens > 0) && ( // Only show if there are lines or tokens
+                     {node.is_dir && (node.lines > 0 || node.tokens > 0) && (
                         <>
                             {node.lines > 0 && <span className="folder-total-lines lines">{node.lines.toLocaleString()}L</span>}
                             {node.tokens > 0 && <span className="folder-total-tokens tokens">~{node.tokens.toLocaleString()}T</span>}
                         </>
                      )}
-                     {/* Selected count for directories (remains useful) */}
                      {node.is_dir && checkboxState !== 'none' && descendantFilePaths.length > 0 && (
                          <span className="selected-count">
                              ({selectedDescendantCount}/{descendantFilePaths.length} sel.)
@@ -235,7 +222,7 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                             <FileTreeNodeComponent
                                 key={child.path}
                                 node={child}
-                                selectedPaths={selectedPaths} 
+                                selectedPaths={selectedPaths}
                                 onToggleSelection={onToggleSelection}
                                 level={level + 1}
                                 searchTerm={searchTerm}
@@ -243,7 +230,7 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                                 expandedPaths={expandedPaths}
                                 onToggleExpand={onToggleExpand}
                                 highlightedPath={highlightedPath}
-                                outOfDateFilePaths={outOfDateFilePaths} 
+                                outOfDateFilePaths={outOfDateFilePaths}
                             />
                         ) : null
                     ))}

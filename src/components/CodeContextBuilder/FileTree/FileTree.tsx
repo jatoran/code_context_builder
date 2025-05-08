@@ -6,7 +6,10 @@ import FileTreeNode from './FileTreeNode';
 import { nodeOrDescendantMatches, findNodeByPath, getNodeDepth, getAllDescendantDirPaths } from './fileTreeUtils';
 
 export interface FileTreeRefHandles {
-    focusSearchInput: () => void;
+    handleSearchKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+    expandTreeLevel: (isCtrlClick: boolean) => void;
+    collapseTreeLevel: (isCtrlClick: boolean) => void;
+    clearSearchState: () => void;
 }
 
 interface FileTreeProps {
@@ -14,7 +17,6 @@ interface FileTreeProps {
     selectedPaths: Set<string>;
     onToggleSelection: (path: string, isDir: boolean) => void;
     searchTerm: string;
-    onSearchTermChange: (term: string) => void;
     onViewFile: (path: string) => void;
     expandedPaths: Set<string>;
     onToggleExpand: (path: string) => void;
@@ -26,7 +28,6 @@ const FileTree = forwardRef<FileTreeRefHandles, FileTreeProps>(({
     selectedPaths,
     onToggleSelection,
     searchTerm,
-    onSearchTermChange,
     onViewFile,
     expandedPaths,
     onToggleExpand,
@@ -34,13 +35,6 @@ const FileTree = forwardRef<FileTreeRefHandles, FileTreeProps>(({
 }, ref) => {
     const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
     const containerRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    useImperativeHandle(ref, () => ({
-        focusSearchInput: () => {
-            inputRef.current?.focus();
-        }
-    }));
 
     const matchingNodes: FileNode[] = useMemo(() => {
         if (!searchTerm || !treeData) return [];
@@ -51,7 +45,7 @@ const FileTree = forwardRef<FileTreeRefHandles, FileTreeProps>(({
             }
             if (node.is_dir && node.children) {
                 if (nodeOrDescendantMatches(node, searchTerm)) {
-                    node.children.forEach(findMatches);
+                     node.children.forEach(findMatches);
                 }
             }
         }
@@ -65,7 +59,7 @@ const FileTree = forwardRef<FileTreeRefHandles, FileTreeProps>(({
     }, [treeData, searchTerm]);
 
     useEffect(() => {
-        setHighlightedIndex(-1);
+        setHighlightedIndex(-1); // Reset when searchTerm changes
     }, [searchTerm]);
 
     useEffect(() => {
@@ -76,25 +70,6 @@ const FileTree = forwardRef<FileTreeRefHandles, FileTreeProps>(({
         }
     }, [highlightedIndex, matchingNodes]);
 
-    const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (!matchingNodes.length && !['Escape'].includes(e.key)) return;
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-             if (matchingNodes.length > 0) { setHighlightedIndex(prev => (prev + 1) % matchingNodes.length); }
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-             if (matchingNodes.length > 0) { setHighlightedIndex(prev => (prev - 1 + matchingNodes.length) % matchingNodes.length); }
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            if (highlightedIndex >= 0) { const node = matchingNodes[highlightedIndex]; onToggleSelection(node.path, node.is_dir); }
-        } else if (e.key === 'Escape') {
-            e.preventDefault();
-            onSearchTermChange("");
-            inputRef.current?.blur();
-            setHighlightedIndex(-1);
-        }
-    }, [matchingNodes, highlightedIndex, onToggleSelection, onSearchTermChange]);
-
     const expandAllDirs = useCallback(() => {
         if (!treeData) return;
         const allDirPaths = new Set(getAllDescendantDirPaths(treeData));
@@ -104,29 +79,22 @@ const FileTree = forwardRef<FileTreeRefHandles, FileTreeProps>(({
     }, [treeData, onToggleExpand, expandedPaths]);
 
     const collapseAllDirs = useCallback(() => {
-        const newExpanded = new Set<string>();
-        expandedPaths.forEach(p => {
-             if (newExpanded.has(p)) { 
-             } else {
-                onToggleExpand(p); 
-             }
+        const currentExpanded = new Set(expandedPaths);
+        currentExpanded.forEach(p => {
+            onToggleExpand(p);
         });
     }, [expandedPaths, onToggleExpand]);
 
-
-    
-    const handleExpand = useCallback((event: React.MouseEvent) => {
+    const handleExpandLevel = useCallback((isCtrlClick: boolean) => {
         if (!treeData) return;
-        if (event.ctrlKey || event.metaKey) {
+        if (isCtrlClick) {
             expandAllDirs();
-        } else { 
-            if (!treeData.is_dir) return; 
-
+        } else {
+            if (!treeData.is_dir) return;
             const newPathsToExpand = new Set<string>();
-            
-            if (expandedPaths.size === 0) {
+            if (expandedPaths.size === 0 && treeData.path) {
                 newPathsToExpand.add(treeData.path);
-            } else { 
+            } else {
                 let currentMaxDepth = -1;
                 expandedPaths.forEach(path => {
                     const node = findNodeByPath(treeData, path);
@@ -137,13 +105,10 @@ const FileTree = forwardRef<FileTreeRefHandles, FileTreeProps>(({
                         }
                     }
                 });
-
                 if (currentMaxDepth === -1) {
-                    if (expandedPaths.has(treeData.path) || expandedPaths.size === 0) { 
+                    if(treeData.path && (expandedPaths.has(treeData.path) || expandedPaths.size === 0)) {
                         treeData.children?.forEach(child => {
-                            if (child.is_dir) {
-                                newPathsToExpand.add(child.path);
-                            }
+                             if (child.is_dir) newPathsToExpand.add(child.path);
                         });
                     }
                 } else {
@@ -153,55 +118,107 @@ const FileTree = forwardRef<FileTreeRefHandles, FileTreeProps>(({
                             const depth = getNodeDepth(treeData, path);
                             if (depth === currentMaxDepth) {
                                 node.children?.forEach(child => {
-                                    if (child.is_dir) {
-                                        newPathsToExpand.add(child.path);
-                                    }
+                                    if (child.is_dir) newPathsToExpand.add(child.path);
                                 });
                             }
                         }
                     });
                 }
             }
-
             newPathsToExpand.forEach(p => {
-                if (!expandedPaths.has(p)) { 
-                    onToggleExpand(p);
-                }
+                if (!expandedPaths.has(p)) onToggleExpand(p);
             });
         }
     }, [treeData, expandedPaths, onToggleExpand, expandAllDirs]);
 
-    const handleCollapse = useCallback((event: React.MouseEvent) => {
+    const handleCollapseLevel = useCallback((isCtrlClick: boolean) => {
         if (!treeData) return;
-        if (event.ctrlKey || event.metaKey) {
+        if (isCtrlClick) {
             collapseAllDirs();
-        } else { 
+        } else {
             if (expandedPaths.size === 0) return;
-
             let maxDepth = -1;
             expandedPaths.forEach(path => {
                 const depth = getNodeDepth(treeData, path);
-                if (depth !== null && depth > maxDepth) {
-                    maxDepth = depth;
-                }
+                if (depth !== null && depth > maxDepth) maxDepth = depth;
             });
-
-            if (maxDepth === -1) return; 
-
+            if (maxDepth === -1 && treeData.path && expandedPaths.has(treeData.path)) {
+                if (expandedPaths.has(treeData.path)) onToggleExpand(treeData.path);
+                return;
+            }
+            if (maxDepth === -1) return;
             const pathsToCollapseAtMaxDepth = new Set<string>();
             expandedPaths.forEach(path => {
                 if (getNodeDepth(treeData, path) === maxDepth) {
                     pathsToCollapseAtMaxDepth.add(path);
                 }
             });
-            pathsToCollapseAtMaxDepth.forEach(p => {
-                 if (expandedPaths.has(p)) onToggleExpand(p);
-            });
+            if (pathsToCollapseAtMaxDepth.size === 0 && treeData.path && expandedPaths.has(treeData.path)) {
+                 if (expandedPaths.has(treeData.path)) onToggleExpand(treeData.path);
+            } else {
+                pathsToCollapseAtMaxDepth.forEach(p => {
+                    if (expandedPaths.has(p)) onToggleExpand(p);
+                });
+            }
         }
     }, [treeData, expandedPaths, onToggleExpand, collapseAllDirs]);
 
+    // This internal handler will be wrapped by useCallback and exposed via ref
+    const _handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!matchingNodes.length && !['ArrowUp', 'ArrowDown', 'Enter'].includes(event.key)) return;
 
-    const highlightedPath = highlightedIndex >= 0 ? matchingNodes[highlightedIndex]?.path : undefined;
+        if (event.key === 'ArrowDown') {
+            if (matchingNodes.length > 0) {
+                setHighlightedIndex(prev => (prev + 1) % matchingNodes.length);
+            }
+        } else if (event.key === 'ArrowUp') {
+            if (matchingNodes.length > 0) {
+                setHighlightedIndex(prev => (prev - 1 + matchingNodes.length) % matchingNodes.length);
+            }
+        } else if (event.key === 'Enter') {
+            if (highlightedIndex >= 0 && highlightedIndex < matchingNodes.length) {
+                const node = matchingNodes[highlightedIndex];
+                onToggleSelection(node.path, node.is_dir);
+            }
+        }
+    };
+
+    useImperativeHandle(ref, () => ({
+        // Expose a stable function that internally calls _handleSearchKeyDown
+        // _handleSearchKeyDown itself will be recreated if its dependencies change
+        // ensuring it always uses the latest state/props from FileTree's scope.
+        // However, we need to ensure that this exposed function will re-bind if
+        // its internal dependencies (matchingNodes, highlightedIndex, onToggleSelection) change.
+        // The most straightforward way is to ensure the function passed to useImperativeHandle
+        // has the correct dependencies, or rely on the fact that _handleSearchKeyDown
+        // will use the latest values from its closure when invoked.
+        // A common pattern is to make the functions themselves stable with useCallback if they are complex.
+        handleSearchKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => {
+             // Direct call to _handleSearchKeyDown.
+             // This works because _handleSearchKeyDown, when defined in the render scope,
+             // will close over the latest matchingNodes, highlightedIndex from that render.
+             // The key is that `matchingNodes` IS a dependency of this component's render,
+             // so when searchTerm changes, FileTree re-renders, matchingNodes updates,
+             // and the _handleSearchKeyDown defined in that new render scope will use the new matchingNodes.
+            _handleSearchKeyDown(event);
+        },
+        expandTreeLevel: handleExpandLevel,
+        collapseTreeLevel: handleCollapseLevel,
+        clearSearchState: () => {
+            setHighlightedIndex(-1);
+        }
+    // Add dependencies here that would cause the imperative handles to be redefined.
+    // Key ones are `matchingNodes` and `highlightedIndex` for `_handleSearchKeyDown`,
+    // and `onToggleSelection`.
+    // `handleExpandLevel` and `handleCollapseLevel` are already stable `useCallback`s.
+    // If `_handleSearchKeyDown` were a `useCallback`, its deps would be `[matchingNodes, highlightedIndex, onToggleSelection, setHighlightedIndex]`
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [matchingNodes, highlightedIndex, onToggleSelection, setHighlightedIndex, handleExpandLevel, handleCollapseLevel]);
+
+
+    const highlightedPath = highlightedIndex >= 0 && highlightedIndex < matchingNodes.length
+        ? matchingNodes[highlightedIndex]?.path
+        : undefined;
 
     const effectiveExpandedPaths = useMemo(() => {
         if (!searchTerm || !treeData) {
@@ -229,21 +246,6 @@ const FileTree = forwardRef<FileTreeRefHandles, FileTreeProps>(({
 
     return (
         <>
-          <div className="search-container">
-                <input
-                    ref={inputRef}
-                    type="text"
-                    placeholder="Search files (Ctrl+F, Arrows, Enter, Esc)..."
-                    value={searchTerm}
-                    onChange={(e) => onSearchTermChange(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                />
-                <button onClick={handleExpand} title="Expand Level (Ctrl+Click for All)">▼ Expand</button>
-                <button onClick={handleCollapse} title="Collapse Level (Ctrl+Click for All)">▲ Collapse</button>
-                {searchTerm && (
-                    <button onClick={() => onSearchTermChange("")} title="Clear Search (Esc)">✕</button>
-                )}
-            </div>
              <div ref={containerRef} className="file-tree-scroll-area" tabIndex={-1}>
                 <ul className="file-tree">
                    {treeData ? (

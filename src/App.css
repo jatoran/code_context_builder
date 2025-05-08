@@ -1,6 +1,4 @@
 
-
-
 :root {
   /* Basic theme variables */
   --bg-color: #1e1e1e;
@@ -158,12 +156,36 @@ html, body, #root {
     padding: 0.5em 1em;
     border-bottom: 1px solid var(--border-secondary-color);
     flex-shrink: 0;
-    gap: 0.5em;
+    gap: 0.5em; /* Default gap between direct children */
 }
 .file-tree-header h3 {
-    margin: 0;
-    flex-grow: 1;
+    margin: 0 0.5em 0 0; /* Give title some space to its right */
+    flex-shrink: 0; /* Prevent title from shrinking too much */
+    white-space: nowrap; /* Prevent title from wrapping if space is tight */
 }
+
+/* New container for search input and its specific buttons */
+.file-tree-search-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.3em; /* Smaller gap for search controls */
+    margin-left: auto; /* Push search controls towards the right, before hotkey button */
+}
+.file-tree-search-controls input {
+    width: 200px; /* Or your desired width */
+    padding: 0.4em 0.6em;
+    margin: 0; /* Override default input margins if any */
+    font-size: 0.9em;
+}
+.file-tree-search-controls button {
+    padding: 0.4em;
+    font-size: 0.9em; /* Make icons/text smaller if needed */
+    line-height: 1;
+    min-width: auto;
+    margin: 0;
+}
+
+
 .collapse-toggle-btn {
     padding: 0.3em 0.6em;
     font-size: 1em;
@@ -176,13 +198,15 @@ html, body, #root {
     font-size: 1em;
     line-height: 1;
     min-width: auto;
-    margin-left: 0.5em; 
+    /* margin-left: 0.5em; /* This will be auto due to search controls margin-left: auto */
     background-color: transparent;
     border: 1px solid transparent;
     color: var(--label-text-color);
+    margin-left: 0.5em; /* Add some space between search controls and help button */
+
 }
 .hotkeys-help-btn:hover {
-    background-color: var(--card-bg-color); 
+    background-color: var(--card-bg-color);
     border-color: var(--border-color);
     color: var(--text-color);
 }
@@ -287,11 +311,11 @@ label {
 .project-manager {
   display: flex;
   flex-direction: column;
-  gap: 0.8em; 
+  gap: 0.8em;
 }
 .project-manager h3 {
-    margin-bottom: 0.5em; 
-    font-size: 1.1em; 
+    margin-bottom: 0.5em;
+    font-size: 1.1em;
 }
 
 /* New layout for Project Manager controls */
@@ -301,7 +325,7 @@ label {
 }
 .pm-row-select select {
   width: 100%; /* Make select full width */
-  padding: 0.4rem 0.6rem; 
+  padding: 0.4rem 0.6rem;
   font-size: 0.9em;
 }
 
@@ -320,7 +344,7 @@ label {
 
 /* General button styling within ProjectManager (was previously .project-controls button) */
 .project-manager button {
-  padding: 0.4rem 0.6rem; 
+  padding: 0.4rem 0.6rem;
   font-size: 1em; /* For icons */
   margin: 0; /* Remove default button margin */
   line-height: 1; /* Better icon alignment */
@@ -334,12 +358,12 @@ label {
 .project-manager button.scan-btn-stale:hover {
     background-color: var(--danger-color);
     border-color: var(--danger-color);
-    color: var(--text-color); 
+    color: var(--text-color);
 }
 .project-manager button.scan-btn-scanning {
   animation: pulseBorder 1.5s infinite ease-in-out;
-  opacity: 1; 
-  cursor: not-allowed; 
+  opacity: 1;
+  cursor: not-allowed;
 }
 
 
@@ -421,35 +445,13 @@ label {
 /* --------------------------------------------------------------------------
    File Tree Area (in file-tree-main-content)
    -------------------------------------------------------------------------- */
-.file-tree-container { 
-    width: 100%; 
+.file-tree-container {
+    width: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    height: 100%; 
+    height: 100%;
     box-sizing: border-box;
-}
-
-/* Search input area */
-.search-container {
-    padding: 0.5em 1em;
-    border-bottom: 1px solid var(--border-secondary-color);
-    flex-shrink: 0;
-    display: flex; 
-    align-items: center; 
-    gap: 0.5em; 
-}
-.search-container input {
-    flex-grow: 1; 
-    padding: 0.4em 0.6em;
-    margin: 0;
-}
-.search-container button {
-    padding: 0.4em; 
-    font-size: 0.9em;
-    line-height: 1;
-    min-width: auto; 
-    margin: 0;
 }
 
 /* Scrollable area for the tree itself */
@@ -483,17 +485,41 @@ label {
 .file-tree-node:hover {
     background-color: rgba(255, 255, 255, 0.05);
 }
-.file-tree-node.highlighted { /* Search term highlight */
-    background-color: #444; /* This is a darker highlight for search, distinct from selection */
-}
-.file-tree-node.selected { /* New: Selected item highlight */
+
+/* General search term match highlight (applied to multiple nodes if they contain the term) - NOT USED for row background currently */
+/* .file-tree-node.highlighted {
+    background-color: #444;
+} */
+
+/* Selected item highlight (checkbox is checked or indeterminate for folders) */
+.file-tree-node.selected {
     background-color: rgba(var(--accent-color-rgb), 0.2); /* Subtle accent color */
 }
 .file-tree-node.selected:hover {
     background-color: rgba(var(--accent-color-rgb), 0.3); /* Slightly more on hover */
 }
-/* If both selected and highlighted (search), the search highlight on .node-name might be more specific or last one wins */
-/* The .node-name.highlight is more specific for text, row bg can be for selection */
+
+/* Search focus highlight (for the single item actively focused by arrow keys) */
+.file-tree-node.search-focused-highlight {
+    background-color: var(--accent-color) !important; /* Use accent color, !important to ensure override */
+    color: var(--bg-color) !important; /* Ensure text is readable (e.g. white text on blue bg) */
+    /* outline: 1px solid var(--text-color); */ /* Optional: add an outline */
+}
+
+/* Ensure that the text color inside a search-focused node's name is also contrasted */
+.file-tree-node.search-focused-highlight .node-name,
+.file-tree-node.search-focused-highlight .node-stats,
+.file-tree-node.search-focused-highlight .node-stats span,
+.file-tree-node.search-focused-highlight .node-icon,
+.file-tree-node.search-focused-highlight .node-toggle {
+    color: var(--bg-color) !important; /* Match the text color of the search-focused-highlight */
+}
+/* If the text part itself is highlighted (node-name.highlight) within a search-focused row */
+.file-tree-node.search-focused-highlight .node-name.highlight {
+    background-color: var(--highlight-background-color) !important; /* Keep its distinct background (#695112) */
+    color: var(--highlight-text-color) !important; /* Keep its distinct text color (#eee) */
+    box-shadow: 0 0 0 1px var(--text-color); /* Add a border to make it pop on accent bg */
+}
 
 
 .node-toggle {
@@ -509,8 +535,16 @@ label {
 .node-checkbox { margin: 0 5px 0 0; flex-shrink: 0; cursor: pointer; width: 14px; height: 14px; accent-color: var(--accent-color); }
 .node-checkbox-placeholder { display: inline-block; width: 14px; height: 14px; margin: 0 5px 0 0; flex-shrink: 0; }
 .node-icon { margin-right: 3px; flex-shrink: 0; user-select: none; }
+
 .node-name { flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 1px 3px; border-radius: 2px; cursor: pointer; user-select: none; }
-.node-name.highlight { background-color: var(--highlight-background-color); color: var(--highlight-text-color); border-radius: 2px; padding: 0 2px; margin: 0 -2px; }
+.node-name.highlight { /* This is for the text part that matches the search term */
+    background-color: var(--highlight-background-color);
+    color: var(--highlight-text-color);
+    border-radius: 2px;
+    padding: 0 2px;
+    margin: 0 -2px; /* To make background seamless with text */
+}
+
 
 /* Existing .node-stats and sub-span styles remain the same */
 .node-stats { margin-left: auto; padding-left: 10px; font-size: 0.8em; color: #aaa; white-space: nowrap; flex-shrink: 0; }
@@ -524,22 +558,18 @@ label {
 /* New styles for folder total stats (from previous update) */
 .node-stats .folder-total-lines,
 .node-stats .folder-total-tokens {
-  opacity: 0.75; 
+  opacity: 0.75;
 }
 
 /* Styles for stale/out-of-date files */
 .file-tree-node .node-name.stale {
   color: var(--danger-color);
-  /* font-style: italic; */ /* Optional: further differentiate */
 }
 .file-tree-node.dir-contains-stale > .node-icon {
-  /* filter: hue-rotate(120deg) saturate(0.5); */ /* Example: greenish tint */
   opacity: 0.7;
 }
 .file-tree-node.dir-contains-stale > .node-name:not(.stale) {
-    /* If dir name itself is not stale, but contains stale children */
-    color: #ffcc80; /* Muted orange/yellow for directory containing stale items */
-    /* opacity: 0.8; */
+    color: #ffcc80;
 }
 
 
@@ -549,16 +579,16 @@ label {
    .left-panel-aggregator {
     display: flex;
     flex-direction: column;
-    height: 100%; 
+    height: 100%;
     box-sizing: border-box;
     gap: 0.5em;
 }
 
 .aggregator-header {
     display: flex;
-    flex-direction: column; 
+    flex-direction: column;
     gap: 0.5em;
-    align-items: flex-start; 
+    align-items: flex-start;
     flex-shrink: 0;
     padding-bottom: 0.5em;
     border-bottom: 1px solid var(--border-secondary-color);
@@ -567,12 +597,12 @@ label {
     margin: 0;
     font-size: 1.1em;
 }
-.aggregator-controls { 
+.aggregator-controls {
     display: flex;
     flex-wrap: wrap; /* Allow wrapping on small screens */
     align-items: center;
     gap: 0.8em; /* Gap between control groups */
-    width: 100%; 
+    width: 100%;
 }
 
 /* New styles for individual control groups and their elements */
@@ -594,7 +624,6 @@ label {
     padding: 0.3em 0.5em; /* Consistent padding */
     font-size: 0.9em;
     margin: 0; /* Remove any default margin */
-    /* Inherits global select styles for background, border, etc. */
 }
 
 .aggregator-controls .control-item input[type="checkbox"] {
@@ -603,7 +632,6 @@ label {
     width: auto; /* Override global input width if set */
     height: auto; /* Override global input height if set */
     vertical-align: middle; /* Align checkbox with label text */
-    /* Inherits global checkbox styles for accent-color, etc. */
 }
 
 .aggregator-stats-display { /* Renamed from .aggregator-header span */
@@ -616,10 +644,10 @@ label {
 
 
 .aggregator-content {
-    flex-grow: 1; 
+    flex-grow: 1;
     width: 100%;
     box-sizing: border-box;
-    background-color: var(--input-background-color); 
+    background-color: var(--input-background-color);
     color: var(--text-color);
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -628,7 +656,7 @@ label {
     overflow: auto;
     resize: none;
     font-family: monospace;
-    white-space: pre; 
+    white-space: pre;
 }
 .aggregator-content::placeholder {
     color: #888;
@@ -798,7 +826,6 @@ label {
     --card-bg-color: #f8f8f8;
     --card-bg-color2: #f0f0f0;
     --danger-color: #d33;
-    /* --sidebar-bg-color: #e8f0f4; */
     --left-panel-bg-color: #f0f4f8; /* Lighter for left panel */
     --background-color: #ffffff;
     --background-secondary-color: #f8f8f8;
@@ -825,7 +852,7 @@ label {
   button.delete-btn { background-color: var(--danger-color); border-color: var(--danger-color); color: #fff; }
   button.delete-btn:hover { background-color: #b00; border-color: #b00; }
   button:disabled { background-color: #e0e0e0; border-color: #d0d0d0; color: #999; }
-  
+
   .project-manager button.scan-btn-stale {
       border-color: var(--danger-color);
       color: var(--danger-color);
@@ -846,20 +873,39 @@ label {
 
   .aggregator-content { background-color: var(--input-background-color); border-color: var(--border-color); color: var(--text-color); }
   .project-form { border-color: var(--border-color); background-color: var(--card-bg-color2); }
-  .search-container { border-bottom-color: var(--border-secondary-color); }
   .aggregator-header { border-bottom-color: var(--border-secondary-color); }
   .status-bar { background-color: #f0f0f0; border-top-color: var(--border-color); color: #555; }
   .status-bar .status-warning { color: var(--danger-color); }
 
 
   .file-tree-node:hover { background-color: rgba(0, 0, 0, 0.03); }
-  .file-tree-node.highlighted { background-color: #eee; } /* Search term highlight */
-  .file-tree-node.selected { /* New: Selected item highlight for light theme */
+  /* .file-tree-node.highlighted { background-color: #eee; } */ /* General search term match highlight */
+  .file-tree-node.selected {
       background-color: rgba(var(--accent-color-rgb), 0.15);
   }
   .file-tree-node.selected:hover {
       background-color: rgba(var(--accent-color-rgb), 0.25);
   }
+
+  /* Search focus highlight for light theme */
+  .file-tree-node.search-focused-highlight {
+      background-color: var(--accent-color) !important;
+      color: #ffffff !important; /* Explicitly white text on accent bg for light theme */
+      /* outline: 1px solid var(--text-color); */
+  }
+    .file-tree-node.search-focused-highlight .node-name,
+    .file-tree-node.search-focused-highlight .node-stats,
+    .file-tree-node.search-focused-highlight .node-stats span,
+    .file-tree-node.search-focused-highlight .node-icon,
+    .file-tree-node.search-focused-highlight .node-toggle {
+        color: #ffffff !important; /* Explicitly white text */
+    }
+    .file-tree-node.search-focused-highlight .node-name.highlight {
+        background-color: var(--highlight-background-color) !important; /* e.g., #fff380 */
+        color: var(--highlight-text-color) !important; /* e.g., #333 */
+        box-shadow: 0 0 0 1px var(--text-color); /* Add a border to make it pop on accent bg */
+    }
+
 
   .node-name.highlight { background-color: var(--highlight-background-color); color: var(--highlight-text-color); }
   .file-tree-node .node-name.stale { color: var(--danger-color); }
@@ -901,14 +947,13 @@ label {
   .save-status.error { color: var(--danger-color); background-color: rgba(230,150,150,0.3); }
 
   .node-stats { color: #555; }
-  .node-stats .lines, .node-stats .folder-total-lines { color: #388e3c; } 
-  .node-stats .tokens, .node-stats .folder-total-tokens { color: #ef6c00; } 
-  .node-stats .time { color: #1976d2; } 
-  /* Updated selected-count color for light theme */
+  .node-stats .lines, .node-stats .folder-total-lines { color: #388e3c; }
+  .node-stats .tokens, .node-stats .folder-total-tokens { color: #ef6c00; }
+  .node-stats .time { color: #1976d2; }
   .node-stats .selected-count { color: #e6b400; } /* Darker Gold/Yellow for light theme */
 
   .node-stats .folder-total-lines,
   .node-stats .folder-total-tokens {
-    opacity: 0.8; 
+    opacity: 0.8;
   }
 }
