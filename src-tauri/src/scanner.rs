@@ -259,16 +259,31 @@ fn do_actual_scan(
             Err(_e) => { return Ok(()); }
         };
         let file_size = meta.len();
-        if file_size == 0 { return Ok(()); }
         if file_size > MAX_FILE_SIZE_BYTES { return Ok(()); }
+
         let last_mod_str = file_modified_timestamp(&meta);
         let path_str = p.to_string_lossy().to_string();
+
+        // Decide if we need to update the cache entry at all
         let needs_update = match cache_map.get(&path_str) {
             Some(entry) => entry.last_modified != last_mod_str || entry.size != file_size,
-            None => true
+            None => true,
         };
         if !needs_update { return Ok(()); }
 
+        // NEW: handle zero-byte files without reading
+        if file_size == 0 {
+            let new_entry = CacheEntry {
+                last_modified: last_mod_str,
+                size: 0,
+                lines: 0,
+                tokens: 0,
+            };
+            { let mut guard = changed_entries.lock().unwrap(); guard.push((path_str.clone(), new_entry)); }
+            return Ok(());
+        }
+
+        // Non-empty files: read and compute stats as before
         let content = match fs::read_to_string(p) {
             Ok(c) => c,
             Err(_e) => {
@@ -282,6 +297,7 @@ fn do_actual_scan(
         let new_entry = CacheEntry { last_modified: last_mod_str, size: file_size, lines, tokens };
         { let mut guard = changed_entries.lock().unwrap(); guard.push((path_str.clone(), new_entry)); }
         Ok(())
+
     });
 
     if let Err(e) = parallel_result { return Err(e); }

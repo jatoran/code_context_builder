@@ -24,6 +24,27 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, select
         copySuccess,
     } = useAggregator({ treeData, selectedPaths, selectedProjectId }); // Pass selectedProjectId
 
+    // NEW: respond to quick-control events
+    useEffect(() => {
+        const onSetFormat = (e: Event) => {
+        const { format } = (e as CustomEvent<{ format?: OutputFormat }>).detail || {};
+        if (format && ['markdown', 'xml', 'raw'].includes(format)) {
+            setSelectedFormat(format as OutputFormat);
+        }
+        };
+        const onSetPrepend = (e: Event) => {
+        const { prepend } = (e as CustomEvent<{ prepend?: boolean }>).detail || {};
+        if (typeof prepend === 'boolean') setPrependFileTree(prepend);
+        };
+
+        window.addEventListener('agg-set-format', onSetFormat as EventListener);
+        window.addEventListener('agg-set-prepend', onSetPrepend as EventListener);
+        return () => {
+        window.removeEventListener('agg-set-format', onSetFormat as EventListener);
+        window.removeEventListener('agg-set-prepend', onSetPrepend as EventListener);
+        };
+    }, [setSelectedFormat, setPrependFileTree]);
+
     // Listen for hotkey event to trigger copy
     useEffect(() => {
         const triggerCopy = () => {

@@ -658,6 +658,18 @@ html.theme-light .save-status.error {
 .mt-1 { margin-top: 0.5rem; } .mt-2 { margin-top: 1rem; }
 .mb-1 { margin-bottom: 0.5rem; } .mb-2 { margin-bottom: 1rem; }
 
+/* App.css */
+.agg-quick-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75em;
+  margin-left: auto; /* pushes it toward the right with the header tools */
+  font-size: 0.9em;
+}
+
 
 /* REMOVED @media (prefers-color-scheme: light) block that used :root here, 
    as theme variables are now controlled by html.theme-light class */
+
+
+  

@@ -15,8 +15,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { Window, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
 import { findNodeByPath as findNodeByPathUtil } from "./components/CodeContextBuilder/FileTree/fileTreeUtils";
+import { OutputFormat } from "./hooks/useAggregator"; // NEW
 
-// ... (existing interfaces and helper functions: ScanProgressPayload, MonitoredFile, debounce, getAllFilePaths, getMonitorableFilesFromTree, TreeStats, calculateTreeStats) ...
 interface ScanProgressPayload {
     progress: number;
     current_path: string;
@@ -86,7 +86,6 @@ const calculateTreeStats = (node: FileNode | null): TreeStats => {
 
 
 function App() {
-    // ... (existing state variables) ...
     const isMountedRef = useRef(true);
     const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<number>(0);
@@ -116,8 +115,57 @@ function App() {
 
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
     const [currentTheme, setCurrentTheme] = useState<ThemeSetting>('system');
+    // NEW: quick control state mirrors aggregator settings
+    const [aggQuickFormat, setAggQuickFormat] = useState<OutputFormat>('markdown');
+    const [aggQuickPrepend, setAggQuickPrepend] = useState<boolean>(false);
 
-    // ... (existing useEffect hooks for isMountedRef, theme loading, theme applying, global copy success, window geometry, file monitoring, scan listeners, scan state persistence) ...
+    // Load aggregator settings for current project so quick controls reflect truth
+    useEffect(() => {
+        if (selectedProjectId > 0) {
+        try {
+            const raw = localStorage.getItem(`ccb_agg_settings_${selectedProjectId}`);
+            if (raw) {
+            const parsed = JSON.parse(raw);
+            setAggQuickFormat(['markdown','xml','raw'].includes(parsed?.format) ? parsed.format : 'markdown');
+            setAggQuickPrepend(!!parsed?.prependTree);
+            } else {
+            setAggQuickFormat('markdown');
+            setAggQuickPrepend(false);
+            }
+        } catch {
+            setAggQuickFormat('markdown');
+            setAggQuickPrepend(false);
+        }
+        } else {
+        setAggQuickFormat('markdown');
+        setAggQuickPrepend(false);
+        }
+    }, [selectedProjectId]);
+
+    // Helpers to update both local state + aggregator (via events) + persist
+    const persistAggSettings = useCallback((fmt: OutputFormat, prep: boolean) => {
+        if (selectedProjectId > 0) {
+        try {
+            localStorage.setItem(
+            `ccb_agg_settings_${selectedProjectId}`,
+            JSON.stringify({ format: fmt, prependTree: prep })
+            );
+        } catch {}
+        }
+    }, [selectedProjectId]);
+
+    const handleQuickFormatChange = useCallback((fmt: OutputFormat) => {
+        setAggQuickFormat(fmt);
+        persistAggSettings(fmt, aggQuickPrepend);
+        window.dispatchEvent(new CustomEvent('agg-set-format', { detail: { format: fmt }}));
+    }, [aggQuickPrepend, persistAggSettings]);
+
+    const handleQuickPrependChange = useCallback((prep: boolean) => {
+        setAggQuickPrepend(prep);
+        persistAggSettings(aggQuickFormat, prep);
+        window.dispatchEvent(new CustomEvent('agg-set-prepend', { detail: { prepend: prep }}));
+    }, [aggQuickFormat, persistAggSettings]);
+
     useEffect(() => { isMountedRef.current = true; return () => { isMountedRef.current = false; }; }, []);
 
     // Load persisted theme setting on mount
@@ -326,7 +374,6 @@ function App() {
         return () => { localIsMountedRef.current = false; };
     }, [loadProjects]);
 
-    // ... (Other useEffect hooks: project selection change, local storage for paths/expanded, left panel collapse) ...
     useEffect(() => {
         const project = projects.find(p => p.id === selectedProjectId);
         if (prevProjectId.current !== selectedProjectId) {
@@ -396,7 +443,6 @@ function App() {
     }, [isScanning, scanProgressPct, currentScanPath]);
 
 
-    // ... (existing handlers: handleSaveCurrentProject, handleCreateNewProject, handleDeleteCurrentProject, handleScanProject, handleCancelScan, handleToggleSelection, handleToggleExpand, handleViewFile, handleCloseModal, handleOpenHotkeysModal, handleCloseHotkeysModal) ...
     const handleSaveCurrentProject = useCallback(async () => {
         if (!selectedProjectId || typeof invoke !== 'function') {
             if (isMountedRef.current) setError("Cannot save: No project selected or API not ready."); return "no_project";
@@ -523,7 +569,6 @@ function App() {
     }, [loadProjects]);
 
 
-    // ... (existing handleGlobalKeyDown, treeStats, stopFileMonitoring cleanup, handleSearchInputKeyDown, handleClearSearch, selectedProject memo) ...
     const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
         const target = event.target as HTMLElement;
         const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
@@ -555,7 +600,16 @@ function App() {
         } else if (event.ctrlKey && event.key === 'ArrowUp' && !isInputFocused) {
             event.preventDefault();
             fileTreeRef.current?.collapseTreeLevel(true); // true for collapse all
-        }
+        
+} else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'M') {
+  event.preventDefault();
+  const order: OutputFormat[] = ['markdown','xml','raw'];
+  const next = order[(order.indexOf(aggQuickFormat) + 1) % order.length];
+  handleQuickFormatChange(next);
+} else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'T') {
+  event.preventDefault();
+  handleQuickPrependChange(!aggQuickPrepend);
+}
     }, [treeData, selectedProjectId, isScanning, handleScanProject, searchInputRef, fileTreeRef]); 
 
     useEffect(() => { window.addEventListener('keydown', handleGlobalKeyDown); return () => window.removeEventListener('keydown', handleGlobalKeyDown); }, [handleGlobalKeyDown]);
@@ -600,7 +654,6 @@ function App() {
             )}
 
             <div className="main-layout">
-                {/* ... (left panel: ProjectManager, Aggregator) ... */}
                 <div className={`left-panel ${isLeftPanelCollapsed ? 'collapsed' : ''}`}>
                     <div className="left-panel-project-manager">
                         {isLoading && <p>Loading Projects...</p>}
@@ -622,12 +675,38 @@ function App() {
                 </div>
 
                 <div className="file-tree-main-content">
-                    {/* ... (file tree header) ... */}
                      <div className="file-tree-header">
                         <button className="collapse-toggle-btn" onClick={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)} title={isLeftPanelCollapsed ? "Show Left Panel" : "Hide Left Panel"}>
                             {isLeftPanelCollapsed ? '▶' : '◀'}
                         </button>
                         <h3>Project Files {isScanning && <span className="header-scanning-indicator">(Scanning...)</span>}</h3>
+                        
+          {/* NEW: Quick Aggregator controls when sidebar collapsed */}
+          {isLeftPanelCollapsed && (
+            <div className="agg-quick-controls" title="Aggregator options (also in sidebar)">
+              <label style={{ marginRight: '0.5em' }}>
+                Format:
+                <select
+                  value={aggQuickFormat}
+                  onChange={(e) => handleQuickFormatChange(e.target.value as OutputFormat)}
+                  style={{ marginLeft: '0.4em' }}
+                >
+                  <option value="markdown">Markdown</option>
+                  <option value="xml">XML</option>
+                  <option value="raw">Raw</option>
+                </select>
+              </label>
+              <label title="Prepend the scanned file tree to aggregated output">
+                <input
+                  type="checkbox"
+                  checked={aggQuickPrepend}
+                  onChange={(e) => handleQuickPrependChange(e.target.checked)}
+                  style={{ marginRight: '0.3em' }}
+                />
+                Prepend Tree
+              </label>
+            </div>
+          )}
                         <div className="file-tree-search-controls">
                             <input 
                                 ref={searchInputRef} 
