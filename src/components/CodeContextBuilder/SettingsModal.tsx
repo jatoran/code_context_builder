@@ -20,9 +20,10 @@ interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     currentTheme: ThemeSetting;
-    onThemeChange: (theme: ThemeSetting) => void; // For live preview
-    projects: AppProject[]; // All current projects for export
-    onImportComplete: () => void; // To refresh project list in App.tsx
+    onThemeChange: (theme: ThemeSetting) => void;
+    projects: AppProject[];
+    onImportComplete: () => void;
+    onOpenHotkeys: () => void; // NEW: open the Hotkeys modal
 }
 
 
@@ -32,7 +33,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     currentTheme, 
     onThemeChange,
     projects,
-    onImportComplete
+    onImportComplete,
+    onOpenHotkeys
 }) => {
     const [themeSelection, setThemeSelection] = useState<ThemeSetting>(currentTheme);
     const [defaultIgnorePatterns, setDefaultIgnorePatterns] = useState<string>('');
@@ -301,6 +303,20 @@ Leading '/': Anchors to project root. Trailing '/': Matches directories.
                                     </p>
                                 )}
                             </div>
+
+                            {/* NEW: Help / Hotkeys */}
+                            <div className="settings-modal-section">
+                                <h5>Help</h5>
+                                <button
+                                    onClick={() => {
+                                        onClose();
+                                        setTimeout(() => onOpenHotkeys(), 0);
+                                    }}
+                                    >
+                                    Hotkeys
+                                </button>
+                            </div>
+
                         </>
                     )}
                 </div>

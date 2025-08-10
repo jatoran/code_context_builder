@@ -221,14 +221,18 @@ export function useAggregator({ treeData, selectedPaths, selectedProjectId }: Us
         let fileContentsMap: BatchFileContentsResponse = {};
 
         if (!treeData) {
-            if (isMountedRef.current) {
-                setAggregatedText('');
-                setTokenCount(0);
-                setIsLoading(false);
-            }
-            return;
-        }
-
+  if (isMountedRef.current) {
+    setAggregatedText('');
+    setTokenCount(0);
+    setIsLoading(false);
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('agg-token-count', {
+      detail: { tokenCount: 0, projectId: selectedProjectId ?? undefined },
+    }));
+  } catch {}
+  return;
+}
         const formatToUse = currentSelectedFormat;
         const prependToUse = currentPrependFileTree;
         const projectRootAbsolutePath = treeData.path; 
@@ -307,20 +311,38 @@ export function useAggregator({ treeData, selectedPaths, selectedProjectId }: Us
         if (isMountedRef.current) setAggregatedText(finalOutput);
 
         if (finalOutput) {
-            try {
-                const count = await invoke<number>("get_text_token_count", { text: finalOutput });
-                if (isMountedRef.current) setTokenCount(count);
-            } catch (tokenError) {
-                console.error("Failed to get token count:", tokenError);
-                if (isMountedRef.current) {
-                    setTokenCount(0);
-                    const err = tokenError instanceof Error ? tokenError.message : String(tokenError);
-                    setError(prev => (prev ? prev + "\n" : "") + `Token count failed: ${err}`);
-                }
-            }
-        } else {
-            if (isMountedRef.current) setTokenCount(0);
-        }
+  let computedCount = 0;
+  try {
+    computedCount = await invoke<number>("get_text_token_count", { text: finalOutput });
+  } catch (tokenError) {
+    console.error("Failed to get token count:", tokenError);
+    if (isMountedRef.current) {
+      setTokenCount(0);
+      const err = tokenError instanceof Error ? tokenError.message : String(tokenError);
+      setError(prev => (prev ? prev + "\n" : "") + `Token count failed: ${err}`);
+    }
+  }
+
+  if (isMountedRef.current) setTokenCount(computedCount);
+  try {
+    window.dispatchEvent(
+      new CustomEvent('agg-token-count', {
+        detail: { tokenCount: computedCount, projectId: selectedProjectId ?? undefined },
+      })
+    );
+  } catch {}
+} else {
+  if (isMountedRef.current) setTokenCount(0);
+  try {
+    window.dispatchEvent(
+      new CustomEvent('agg-token-count', {
+        detail: { tokenCount: 0, projectId: selectedProjectId ?? undefined },
+      })
+    );
+  } catch {}
+}
+
+        
 
         if (isMountedRef.current) setIsLoading(false);
     }, [treeData, selectedPaths, currentSelectedFormat, currentPrependFileTree, buildAggregatedContentRecursive]);

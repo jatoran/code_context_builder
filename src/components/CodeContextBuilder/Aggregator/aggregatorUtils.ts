@@ -17,6 +17,11 @@ export function escapeXml(unsafe: string): string {
     });
 }
 
+// Minimal escaping for element *text* content (quotes don't need escaping in text)
+export function escapeXmlText(unsafe: string): string {
+    return unsafe.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
+}
+
 export function getLanguageFromPath(filePath: string): string {
     const extension = filePath.split('.').pop()?.toLowerCase();
     if (!extension) return '';
@@ -58,8 +63,11 @@ export function formatFileContent(
         // Use filePath for the markdown header instead of just fileName
         return `${header} ${escapeXml(filePath)}\n\`\`\`${lang}\n${content}\n\`\`\`\n---\n\n`;
     } else if (format === 'xml') {
-        const indent = '  '.repeat(depth -1); // Assuming depth 1 is root, file content is not indented further than its tag
-        return `${indent}<file name="${escapeXml(fileName)}" path="${escapeXml(filePath)}">\n${indent}  <![CDATA[\n${content}\n${indent}  ]]>\n${indent}</file>\n\n`;
+        const indent = '  '.repeat(depth - 1);
+        const escaped = escapeXmlText(content);
+        // Put content as element text (no CDATA). Do NOT indent the content line(s)
+        // so we don't introduce leading spaces; xml:space="preserve" keeps whitespace.
+        return `${indent}<file name="${escapeXml(fileName)}" path="${escapeXml(filePath)}" xml:space="preserve">\n${escaped}\n${indent}</file>\n\n`;
     } else if (format === 'raw') {
         return `\`\`\`${lang}\n${content}\n\`\`\`\n`; // Ensure a single newline at the end for separation
     }

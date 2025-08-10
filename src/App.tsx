@@ -119,6 +119,48 @@ function App() {
     const [aggQuickFormat, setAggQuickFormat] = useState<OutputFormat>('markdown');
     const [aggQuickPrepend, setAggQuickPrepend] = useState<boolean>(false);
 
+const [aggTokenCount, setAggTokenCount] = useState<number>(0);
+
+// listen for token count emitted by Aggregator
+useEffect(() => {
+  const handler = (e: Event) => {
+    const d = (e as CustomEvent<{ tokenCount: number; projectId?: number }>).detail;
+    if (!d) return;
+    // If Aggregator includes a projectId, ignore updates from another project
+    if (selectedProjectId && d.projectId && d.projectId !== selectedProjectId) return;
+    if (isMountedRef.current) setAggTokenCount(d.tokenCount || 0);
+  };
+  window.addEventListener('agg-token-count', handler as EventListener);
+  return () => window.removeEventListener('agg-token-count', handler as EventListener);
+}, [selectedProjectId]);
+
+// aggregated stats from current selection
+const aggregatedStats = useMemo(() => {
+  if (!treeData || selectedPaths.size === 0) {
+    return { files: 0, folders: 0, lines: 0, tokens: 0 };
+  }
+  let files = 0;
+  let lines = 0;
+  let tokens = 0;
+  const folders = new Set<string>();
+
+  selectedPaths.forEach((p) => {
+    const node = findNodeByPathUtil(treeData, p);
+    if (node && !node.is_dir) {
+      files += 1;
+      lines += node.lines;
+      tokens += node.tokens;
+      const slash = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+      if (slash > 0) folders.add(p.slice(0, slash));
+    }
+  });
+
+  return { files, folders: folders.size, lines, tokens };
+}, [treeData, selectedPaths]);
+
+// prefer the live Aggregator token count if we have one (fallback to sum of file tokens)
+const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
+
     // Load aggregator settings for current project so quick controls reflect truth
     useEffect(() => {
         if (selectedProjectId > 0) {
@@ -631,14 +673,16 @@ function App() {
             {viewingFilePath && (<FileViewerModal filePath={viewingFilePath} onClose={handleCloseModal} />)}
             {isHotkeysModalOpen && (<HotkeysModal isOpen={isHotkeysModalOpen} onClose={handleCloseHotkeysModal} />)}
             {isSettingsModalOpen && (
-                <SettingsModal 
-                    isOpen={isSettingsModalOpen} 
-                    onClose={handleCloseSettingsModal}
-                    currentTheme={currentTheme}
-                    onThemeChange={handleThemeSettingChange} 
-                    projects={projects} // Pass projects for export
-                    onImportComplete={handleImportComplete} // Pass callback for import refresh
-                />
+            <SettingsModal 
+                isOpen={isSettingsModalOpen} 
+                onClose={handleCloseSettingsModal}
+                currentTheme={currentTheme}
+                onThemeChange={handleThemeSettingChange} 
+                projects={projects}
+                onImportComplete={handleImportComplete}
+                onOpenHotkeys={handleOpenHotkeysModal}
+            />
+
             )}
             {isScanning && (
                 <div className="scan-overlay">
@@ -721,7 +765,8 @@ function App() {
                             <button onClick={(e) => fileTreeRef.current?.collapseTreeLevel(e.ctrlKey || e.metaKey)} title="Collapse Level (Ctrl+Click for All)">▲</button>
                             {searchTerm && (<button onClick={handleClearSearch} title="Clear Search (Esc)">✕</button>)}
                         </div>
-                        <button onClick={handleOpenHotkeysModal} title="View Keyboard Shortcuts" className="hotkeys-help-btn">?</button>
+                       {/* Hotkeys button moved into Settings modal */}
+
                         <button onClick={handleOpenSettingsModal} title="Application Settings" className="settings-btn">⚙️</button>
                     </div>
                     <FileTree
@@ -741,7 +786,12 @@ function App() {
                     )}
                 </div>
             </div>
-            <StatusBar stats={treeStats} lastScanTime={selectedProject?.updated_at} outOfDateFileCount={outOfDateFilePaths.size} />
+            <StatusBar
+  stats={treeStats}
+  lastScanTime={selectedProject?.updated_at}
+  outOfDateFileCount={outOfDateFilePaths.size}
+  aggregated={{ ...aggregatedStats, tokens: effectiveAggTokens }}
+/>
         </div>
     );
 }

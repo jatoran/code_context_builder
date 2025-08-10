@@ -37,6 +37,8 @@ const HotkeysModal: React.FC<HotkeysModalProps> = ({ isOpen, onClose }) => {
                     <ul>
                         <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> : Copy Aggregated Context</li>
                         <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd> : Scan Current Project</li>
+                        <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>M</kbd> : Cycle Aggregator Format (Markdown → XML → Raw)</li>
+                        <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>T</kbd> : Toggle “Prepend Tree” in Aggregator</li>
                         
                         <hr />
                         

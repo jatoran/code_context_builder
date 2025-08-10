@@ -46,6 +46,17 @@
   --settings-modal-border: var(--border-color);
   --settings-modal-header-border: var(--border-secondary-color);
   --settings-modal-radio-accent: var(--accent-color);
+
+  --agg-accent-color: #24b694;
+  --agg-accent-color-rgb: 36, 182, 148;
+
+  /* subtle group backgrounds in the status bar */
+  --status-project-bg: rgba(var(--accent-color-rgb), 0.12);
+  --status-agg-bg: rgba(var(--agg-accent-color-rgb), 0.12);
+  --status-group-border: rgba(255, 255, 255, 0.08);
+
+  --tooltip-bg: #111;
+  --tooltip-text: #fff;
 }
 
 /* Light Theme Overrides - applied when html.theme-light is present */
@@ -77,7 +88,18 @@ html.theme-light {
   --toast-success-text: darkgreen;
   --toast-error-bg: rgba(230, 150, 150, 0.9);
   --toast-error-text: var(--danger-color);
+
   
+  --agg-accent-color: #1f8d75;
+  --agg-accent-color-rgb: 31, 141, 117;
+
+  --status-project-bg: rgba(var(--accent-color-rgb), 0.10);
+  --status-agg-bg: rgba(var(--agg-accent-color-rgb), 0.12);
+  --status-group-border: rgba(0, 0, 0, 0.08);
+  
+  --tooltip-bg: #333;
+  --tooltip-text: #fff;
+
   color-scheme: light; /* Update color scheme for light theme */
 
   /* Component specific overrides for light theme */
@@ -259,7 +281,9 @@ html, body, #root {
     padding: 0.5em 1em;
     border-bottom: 1px solid var(--border-secondary-color);
     flex-shrink: 0;
-    gap: 0.5em; 
+    gap: 0.5em;
+    flex-wrap: nowrap;        /* NEW: keep the header on one line */
+    overflow: hidden;         /* NEW: avoid ugly overflow when tight */
 }
 .file-tree-header h3 {
     margin: 0 0.5em 0 0; 
@@ -271,21 +295,45 @@ html, body, #root {
 .file-tree-search-controls {
     display: flex;
     align-items: center;
-    gap: 0.3em; 
-    margin-left: auto; 
+    gap: 0.3em;
+    margin-left: auto;
+    flex: 0 0 auto; /* don't let search controls squish the title/other items */
 }
 .file-tree-search-controls input {
-    width: 200px; 
+    width: 200px;
     padding: 0.4em 0.6em;
-    margin: 0; 
+    margin: 0;
     font-size: 0.9em;
 }
 .file-tree-search-controls button {
     padding: 0.4em;
-    font-size: 0.9em; 
+    font-size: 0.9em;
     line-height: 1;
     min-width: auto;
     margin: 0;
+}
+
+/* NEW: quick controls in the header (shown only when left panel is collapsed) */
+.agg-quick-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    white-space: nowrap;  /* keep "Format:" and its <select> on one line */
+    flex: 0 0 auto;       /* never grow or shrink */
+    overflow: hidden;
+}
+.agg-quick-controls select {
+    max-width: 140px;     /* stays compact in tight spaces */
+}
+
+/* NEW: hide quick controls under narrower widths to avoid wrapping */
+@media (max-width: 1200px) {
+  .agg-quick-controls { display: none; }
+}
+
+/* Optional: tighten search box a bit on very small widths */
+@media (max-width: 900px) {
+  .file-tree-search-controls input { width: 150px; }
 }
 
 
@@ -386,6 +434,11 @@ html.theme-light .hotkeys-modal-body pre {
 /* ==========================================================================
    Component Styles
    ========================================================================== */
+
+/* Modal stacking: ensure Hotkeys sits above Settings */
+.settings-modal-overlay { position: fixed; inset: 0; z-index: 1000; }
+.hotkeys-modal-overlay  { position: fixed; inset: 0; z-index: 1100; }
+.file-viewer-modal-overlay { position: fixed; inset: 0; z-index: 1200; } /* optional: keep viewer on top */
 
 h1, h2, h3, h4, h5, h6 { margin-top: 0; margin-bottom: 0.5em; font-weight: 500; }
 
@@ -561,19 +614,205 @@ html.theme-light .save-status.error {
 .aggregator-actions { text-align: right; margin-top: 0.5em; flex-shrink: 0; }
 .aggregator-actions button { margin-left: 0.5em; padding: 0.5rem 1rem; }
 
-
 /* --------------------------------------------------------------------------
    Status Bar (Bottom of app-container)
    -------------------------------------------------------------------------- */
-.status-bar { --status-bar-height: 30px; height: var(--status-bar-height); background-color: #222; border-top: 1px solid var(--border-color); padding: 0 1em; display: flex; align-items: center; justify-content: space-between; font-size: 0.85em; color: #ccc; flex-shrink: 0; box-sizing: border-box; }
-.status-bar-left, .status-bar-right { display: flex; gap: 1em; align-items: center; }
+.status-bar {
+  --status-bar-height: 30px;
+  height: var(--status-bar-height);
+  background-color: #222;
+  border-top: 1px solid var(--border-color);
+  padding: 0 1em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85em;
+  color: #ccc;
+  flex-shrink: 0;
+  box-sizing: border-box;
+
+  /* keep on one line, let tooltips render upward/outside */
+  white-space: nowrap;
+  overflow: visible;
+
+  /* Tooltip tuning */
+  --tooltip-max-width: min(95vw, 720px);
+  --tooltip-min-width: 320px;
+  --tooltip-arrow-offset: 16px;
+}
+
+.status-bar-left,
+.status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75em;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
 .status-bar span { white-space: nowrap; }
-.status-bar .stat-files { color: #6ef076; }
+.status-bar .stat-files   { color: #6ef076; }
 .status-bar .stat-folders { color: #f0b76e; }
-.status-bar .stat-lines { color: #6ef076; }
-.status-bar .stat-tokens { color: #f0b76e; }
-.status-bar .stat-time { color: #6ebbf0; }
+.status-bar .stat-lines   { color: #6ef076; }
+.status-bar .stat-tokens  { color: #f0b76e; }
+.status-bar .stat-time    { color: #6ebbf0; }
 .status-bar .status-warning { color: var(--danger-color); font-weight: bold; margin-left: 0.5em; }
+
+/* group container */
+.status-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--status-group-border);
+  background: var(--status-project-bg); /* default */
+}
+
+/* project vs aggregated tints */
+.status-group.project .group-label { color: var(--accent-color); }
+.status-group.agg     { background: var(--status-agg-bg); }
+.status-group.agg .group-label { color: var(--agg-accent-color); }
+
+/* label */
+.status-group .group-label {
+  font-weight: 600;
+  letter-spacing: .2px;
+  opacity: 0.95;
+}
+
+/* divider between groups */
+.status-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border-color);
+  opacity: .6;
+}
+
+/* responsive trims */
+@media (max-width: 880px) { .status-bar { font-size: 0.82em; } }
+
+/* staged collapse
+   1) ≤1000px: collapse PROJECT stats only
+*/
+@media (max-width: 1000px) {
+  .status-bar .status-group.project .stat-files,
+  .status-bar .status-group.project .stat-folders,
+  .status-bar .status-group.project .stat-lines,
+  .status-bar .status-group.project .stat-tokens {
+    display: none;
+  }
+  .status-bar .status-group.project { cursor: help; }
+  .status-bar .status-group.project .group-label::after {
+    content: " ⓘ";
+    opacity: 0.65;
+    margin-left: 0.25em;
+    font-size: 0.9em;
+  }
+}
+
+/* 2) ≤600px: collapse AGGREGATED stats too (and hide divider) */
+@media (max-width: 600px) {
+  .status-bar .status-group.agg .stat-files,
+  .status-bar .status-group.agg .stat-folders,
+  .status-bar .status-group.agg .stat-lines,
+  .status-bar .status-group.agg .stat-tokens {
+    display: none;
+  }
+  .status-bar .status-group.agg { cursor: help; }
+  .status-bar .status-group.agg .group-label::after {
+    content: " ⓘ";
+    opacity: 0.65;
+    margin-left: 0.25em;
+    font-size: 0.9em;
+  }
+  .status-bar .status-divider { display: none; }
+}
+
+/* Optional: hide time on very small widths */
+@media (max-width: 700px) {
+  .status-bar-right .stat-time { display: none; }
+}
+
+/* ---------- Tooltip (upward, edge-safe) ---------- */
+.status-group.has-tooltip { position: relative; }
+
+.status-group.has-tooltip::after,
+.status-group.has-tooltip::before {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 9999;
+}
+
+/* Default: LEFT-ALIGNED bubble to avoid left-edge clipping */
+.status-group.has-tooltip::after {
+  content: attr(data-tooltip);
+  left: 0;                     /* anchor bubble to group's left edge */
+  right: auto;
+  bottom: calc(100% + 12px);   /* above the group */
+  transform: translate(0, 4px);
+  background: var(--tooltip-bg);
+  color: var(--tooltip-text);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  white-space: normal;
+  width: max-content;
+  max-width: var(--tooltip-max-width);
+  min-width: var(--tooltip-min-width);
+  box-shadow: 0 6px 18px var(--modal-shadow-color);
+  line-height: 1.35;
+  text-align: left;
+  overflow-wrap: break-word;
+}
+
+/* Arrow (downward, pointing at bar) */
+.status-group.has-tooltip::before {
+  content: "";
+  left: var(--tooltip-arrow-offset);
+  right: auto;
+  bottom: calc(100% + 2px);
+  transform: translate(0, 6px);
+  border-width: 6px;
+  border-style: solid;
+  border-color: var(--tooltip-bg) transparent transparent transparent;
+  filter: drop-shadow(0 1px 0 var(--border-color));
+}
+
+/* Hover state */
+.status-group.has-tooltip:hover::after,
+.status-group.has-tooltip:hover::before {
+  opacity: 1;
+  transform: translate(0, 0);
+}
+
+/* OPTIONAL: flip to right edge if a group sits near the right boundary */
+.status-group.has-tooltip.edge-right::after {
+  left: auto;
+  right: 0;
+  transform: translate(0, 4px);
+  text-align: right;
+}
+.status-group.has-tooltip.edge-right::before {
+  left: auto;
+  right: var(--tooltip-arrow-offset);
+  transform: translate(0, 6px);
+}
+
+/* OPTIONAL: centered bubble variant */
+.status-group.has-tooltip.centered::after {
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, 4px);
+  text-align: center;
+}
+.status-group.has-tooltip.centered::before {
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, 6px);
+}
 
 
 /* ==========================================================================
