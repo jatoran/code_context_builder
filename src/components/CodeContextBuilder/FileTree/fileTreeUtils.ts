@@ -66,6 +66,15 @@ export function formatTimeAgo(lastModified: string): string {
   return `${Math.floor(diffDays / 365)}y`;
 }
 
+// NEW: absolute/local timestamp for tooltips
+export function formatAbsoluteTimestamp(lastModified: string): string {
+  if (!lastModified) return "";
+  const epoch = parseInt(lastModified, 10);
+  if (isNaN(epoch)) return "";
+  const date = new Date(epoch * 1000);
+  return date.toLocaleString(); // user’s locale & timezone (clearer for hover)
+}
+
 
 // Helper to find a node by its path
 export const findNodeByPath = (node: FileNode | null, path: string): FileNode | null => {

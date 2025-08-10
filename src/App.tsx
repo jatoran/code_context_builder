@@ -111,6 +111,41 @@ function App() {
     const globalCopySuccessTimerRef = useRef<number | null>(null);
     const fileTreeRef = useRef<FileTreeRefHandles>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
+
+/** Auto-clear search text a few seconds after blur if focus doesn't return */
+const searchClearTimerRef = useRef<number | null>(null);
+const CLEAR_SEARCH_DELAY_MS = 2000;
+
+const cancelSearchClearTimer = useCallback(() => {
+  if (searchClearTimerRef.current) {
+    clearTimeout(searchClearTimerRef.current);
+    searchClearTimerRef.current = null;
+  }
+}, []);
+
+const scheduleSearchAutoClear = useCallback(() => {
+  // don't schedule if there's nothing to clear
+  if (!searchTerm) return;
+  cancelSearchClearTimer();
+  searchClearTimerRef.current = window.setTimeout(() => {
+    setSearchTerm("");
+    fileTreeRef.current?.clearSearchState();
+  }, CLEAR_SEARCH_DELAY_MS);
+}, [searchTerm, cancelSearchClearTimer]);
+
+const handleSearchInputFocus = useCallback(() => {
+  cancelSearchClearTimer();
+}, [cancelSearchClearTimer]);
+
+const handleSearchInputBlur = useCallback(() => {
+  scheduleSearchAutoClear();
+}, [scheduleSearchAutoClear]);
+
+// cleanup on unmount
+useEffect(() => {
+  return () => cancelSearchClearTimer();
+}, [cancelSearchClearTimer]);
+
     const prevProjectId = useRef<number | null>(null);
 
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
@@ -659,10 +694,23 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
     useEffect(() => { return () => { stopFileMonitoring(); }; }, [stopFileMonitoring]);
 
     const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Escape') { e.preventDefault(); setSearchTerm(""); fileTreeRef.current?.clearSearchState(); searchInputRef.current?.blur(); } 
-        else if (['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) { e.preventDefault(); fileTreeRef.current?.handleSearchKeyDown(e); }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelSearchClearTimer();
+            setSearchTerm("");
+            fileTreeRef.current?.clearSearchState();
+            searchInputRef.current?.blur();
+        } else if (['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+            e.preventDefault();
+            fileTreeRef.current?.handleSearchKeyDown(e);
+        }
     };
-    const handleClearSearch = () => { setSearchTerm(""); fileTreeRef.current?.clearSearchState(); searchInputRef.current?.focus(); };
+    const handleClearSearch = () => {
+  cancelSearchClearTimer();
+  setSearchTerm("");
+  fileTreeRef.current?.clearSearchState();
+  searchInputRef.current?.focus();
+};
 
     const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
     const searchInputTitle = "Search files. Ctrl+F to focus. In search: ↓/↑ to navigate results, Enter to toggle selection, Esc to clear & unfocus.";
@@ -753,14 +801,17 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
           )}
                         <div className="file-tree-search-controls">
                             <input 
-                                ref={searchInputRef} 
-                                type="text" 
-                                placeholder="Search (Ctrl+F)..." 
-                                value={searchTerm} 
-                                onChange={(e) => setSearchTerm(e.target.value)} 
-                                onKeyDown={handleSearchInputKeyDown}
-                                title={searchInputTitle}
-                            />
+    ref={searchInputRef} 
+    type="text" 
+    placeholder="Search (Ctrl+F)..." 
+    value={searchTerm} 
+    onChange={(e) => setSearchTerm(e.target.value)} 
+    onKeyDown={handleSearchInputKeyDown}
+    onFocus={handleSearchInputFocus}
+    onBlur={handleSearchInputBlur}
+    title={searchInputTitle}
+/>
+
                             <button onClick={(e) => fileTreeRef.current?.expandTreeLevel(e.ctrlKey || e.metaKey)} title="Expand Level (Ctrl+Click for All)">▼</button>
                             <button onClick={(e) => fileTreeRef.current?.collapseTreeLevel(e.ctrlKey || e.metaKey)} title="Collapse Level (Ctrl+Click for All)">▲</button>
                             {searchTerm && (<button onClick={handleClearSearch} title="Clear Search (Esc)">✕</button>)}

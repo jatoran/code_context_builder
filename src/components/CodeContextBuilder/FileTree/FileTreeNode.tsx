@@ -6,6 +6,7 @@ import {
     getAllDescendantFilePaths,
     nodeOrDescendantMatches,
     formatTimeAgo,
+    formatAbsoluteTimestamp,
 } from './fileTreeUtils';
 
 interface FileTreeNodeProps {
@@ -176,8 +177,28 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
         } else {
             actionText = '\n(Shift+Click to view, Click to select/deselect)';
         }
+
+        // For files: include lines, tokens, and absolute + relative last updated
+        if (!node.is_dir) {
+            const linesText = `${node.lines.toLocaleString()} lines`;
+            const tokensText = `~${node.tokens.toLocaleString()} tokens`;
+            const abs = node.last_modified ? formatAbsoluteTimestamp(node.last_modified) : 'unknown';
+            const rel = node.last_modified ? formatTimeAgo(node.last_modified) : '';
+            const lastUpdatedText = `Last updated: ${abs}${rel ? ` (${rel})` : ''}`;
+
+            return (
+                `${node.path}\n` +
+                `${linesText} • ${tokensText}\n` +
+                `${lastUpdatedText}` +
+                `${actionText}` +
+                (isNodeStale ? '\n(File modified since last scan)' : '')
+            );
+        }
+
+        // For folders: keep existing behavior
         return node.path + actionText + (isNodeStale ? '\n(File modified since last scan)' : '');
-    }, [node.path, node.is_dir, isNodeStale]);
+    }, [node.path, node.is_dir, node.lines, node.tokens, node.last_modified, isNodeStale]);
+
 
     // Conditional return now happens AFTER all hooks have been called.
     if (searchTerm && !isVisible) {
@@ -260,7 +281,14 @@ const FileTreeNodeComponent: React.FC<FileTreeNodeProps> = React.memo(({
                         <>
                           {node.lines > 0 && <span className="lines">{node.lines.toLocaleString()}L</span>}
                           {node.tokens > 0 && <span className="tokens">~{node.tokens.toLocaleString()}T</span>}
-                          {node.last_modified && <span className="time">{formatTimeAgo(node.last_modified)}</span>}
+                          {node.last_modified && (
+  <span
+    className="time"
+    title={formatAbsoluteTimestamp(node.last_modified)}
+  >
+    {formatTimeAgo(node.last_modified)}
+  </span>
+)}
                         </>
                     )}
                      {node.is_dir && (node.lines > 0 || node.tokens > 0) && (

@@ -21,13 +21,6 @@ interface ProjectManagerProps {
   outOfDateFileCount: number;
 }
 
-function safeSetItem(key: string, value: any) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.warn("localStorage setItem error:", e); }
-}
-function safeGetItem<T>(key: string, defaultValue: T): T {
-    try { const item = localStorage.getItem(key); return item ? JSON.parse(item) : defaultValue; } catch (e) { console.warn("localStorage getItem error:", e); return defaultValue; }
-}
-
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 
@@ -48,7 +41,8 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
   isScanning,
   outOfDateFileCount,
 }) => {
-  const [showSettings, setShowSettings] = useState<boolean>(() => safeGetItem('ccb_showProjectSettings', true));
+  const [showSettings, setShowSettings] = useState<boolean>(false); // start collapsed; no persistence
+
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const saveTimeoutRef = useRef<number | null>(null);
   const isMountedRef = useRef(true);
@@ -70,20 +64,17 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
   }, []);
 
 
+  // Effect: whenever the selected project changes, auto-collapse settings
+  // and clear any pending delete confirmation.
   useEffect(() => {
-      safeSetItem('ccb_showProjectSettings', showSettings);
-  }, [showSettings]);
-
-  // Effect to clear confirm delete state if selected project changes or becomes 0
-  useEffect(() => {
-    if (confirmDeleteProjectId !== null && confirmDeleteProjectId !== selectedProjectId) {
-        if (confirmDeleteTimerRef.current) {
-            clearTimeout(confirmDeleteTimerRef.current);
-            confirmDeleteTimerRef.current = null;
-        }
-        setConfirmDeleteProjectId(null);
+    setShowSettings(false);
+    if (confirmDeleteTimerRef.current) {
+      clearTimeout(confirmDeleteTimerRef.current);
+      confirmDeleteTimerRef.current = null;
     }
-  }, [selectedProjectId, confirmDeleteProjectId]);
+    setConfirmDeleteProjectId(null);
+  }, [selectedProjectId]);
+
 
 
   const hasProjects = projects.length > 0;
@@ -234,13 +225,17 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
           >
             {deleteButtonIcon}
           </button>
-          <button
-              onClick={() => setShowSettings(!showSettings)}
-              disabled={isScanning || !projectSelected}
-              title={showSettings ? "Hide Project Settings" : "Show Project Settings"}
-          >
-            {showSettings ? '⚙️' : '⚙️'} 
-          </button>
+<button
+  onClick={() => setShowSettings(!showSettings)}
+  disabled={isScanning || !projectSelected}
+  title={showSettings ? "Hide Project Settings" : "Show Project Settings"}
+  aria-expanded={showSettings}
+  aria-controls="project-settings-panel"
+  className={`settings-toggle-btn${showSettings ? ' open' : ''}`}
+>
+  ⚙️ {showSettings ? ' ▼' : ''}
+</button>
+
         </div>
         <button
            onClick={onScanProject}
@@ -252,16 +247,23 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         </button>
       </div>
 
-      {showSettings && projectSelected && (
-        <ProjectManagerForm
-          projectTitle={projectTitle}
-          setProjectTitle={setProjectTitle}
-          rootFolder={rootFolder}
-          setRootFolder={setRootFolder}
-          ignoreText={ignoreText}
-          setIgnoreText={setIgnoreText}
-        />
-      )}
+<div
+  id="project-settings-panel"
+  hidden={!showSettings || !projectSelected}
+  aria-hidden={!showSettings || !projectSelected}
+>
+  {showSettings && projectSelected ? (
+    <ProjectManagerForm
+      projectTitle={projectTitle}
+      setProjectTitle={setProjectTitle}
+      rootFolder={rootFolder}
+      setRootFolder={setRootFolder}
+      ignoreText={ignoreText}
+      setIgnoreText={setIgnoreText}
+    />
+  ) : null}
+</div>
+
        {showSettings && !projectSelected && (
          <p style={{marginTop: '1em', fontStyle: 'italic', color: '#aaa'}}>
              Select or create a project to view and edit its settings.
