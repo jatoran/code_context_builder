@@ -1,6 +1,7 @@
+
 // src/hooks/useAggregator.ts
 
-import { useState, useEffect, useCallback, useRef } from 'react'; // Added useRef
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { FileNode } from '../types/scanner';
 import {
@@ -19,13 +20,17 @@ interface AggregatorSettings {
 }
 
 interface UseAggregatorProps {
-    treeData: FileNode | null;
-    selectedPaths: Set<string>;
-    selectedProjectId: number | null;
+  treeData: FileNode | null;
+  selectedPaths: Set<string>;
+  selectedProjectId: number | null;
+
+  // Corrected to match the props from Aggregator.tsx
+  compress?: boolean;
+  removeComments?: boolean;
 }
 
 // Type for the result of a single file read in the batch response
-type FileContentResult = { Ok: string } | { Err: string };
+type FileContentResult = string | { Ok: string } | { Err: string };
 // Type for the overall batch file contents response from Tauri
 type BatchFileContentsResponse = Record<string, FileContentResult>;
 
@@ -54,20 +59,18 @@ const isDirRelevantForAggregation = (dirNode: FileNode, selectedPaths: Set<strin
 function getRelativePath(fullPath: string, rootPath: string): string {
     if (fullPath.startsWith(rootPath)) {
         let relative = fullPath.substring(rootPath.length);
-        // Remove leading slash or backslash
         if (relative.startsWith('/') || relative.startsWith('\\')) {
             relative = relative.substring(1);
         }
         return relative;
     }
-    return fullPath; // Fallback, though should ideally always be relative
+    return fullPath;
 }
 
-// New helper to collect all unique file paths that need content
 const collectFilePathsForAggregation = (
     node: FileNode | null,
     selectedPaths: Set<string>,
-    pathsSet: Set<string> // Use a Set to ensure uniqueness
+    pathsSet: Set<string>
 ): void => {
     if (!node) return;
 
@@ -76,8 +79,6 @@ const collectFilePathsForAggregation = (
     }
 
     if (node.is_dir && node.children) {
-        // Only recurse into directories if they are relevant (contain selected files or subdirs)
-        // or if the directory itself is somehow marked as "selected for aggregation" (not currently a feature, but for completeness)
         if (isDirRelevantForAggregation(node, selectedPaths)) {
             for (const child of node.children) {
                 collectFilePathsForAggregation(child, selectedPaths, pathsSet);
@@ -87,24 +88,26 @@ const collectFilePathsForAggregation = (
 };
 
 
-export function useAggregator({ treeData, selectedPaths, selectedProjectId }: UseAggregatorProps): UseAggregatorReturn {
-    const isMountedRef = useRef(true); // For mounted check within the hook
-
+export function useAggregator({
+  treeData,
+  selectedPaths,
+  selectedProjectId,
+  compress, // Corrected prop name
+  removeComments,
+}: UseAggregatorProps): UseAggregatorReturn {
+    const isMountedRef = useRef(true);
     const [aggregatedText, setAggregatedText] = useState<string>('');
     const [tokenCount, setTokenCount] = useState<number>(0);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [copySuccess, setCopySuccess] = useState<boolean>(false);
-
     const [currentSelectedFormat, setCurrentSelectedFormat] = useState<OutputFormat>('markdown');
     const [currentPrependFileTree, setCurrentPrependFileTree] = useState<boolean>(false);
 
     useEffect(() => {
         isMountedRef.current = true;
-        return () => {
-            isMountedRef.current = false;
-        };
-    }, []); // Runs once when the hook is used by a component
+        return () => { isMountedRef.current = false; };
+    }, []);
 
     useEffect(() => {
         if (selectedProjectId && selectedProjectId > 0) {
@@ -123,16 +126,10 @@ export function useAggregator({ treeData, selectedPaths, selectedProjectId }: Us
                      }
                 }
             } catch (e) {
-                console.error("Failed to parse aggregator settings from localStorage for project " + selectedProjectId, e);
                 if (isMountedRef.current) {
                     setCurrentSelectedFormat('markdown');
                     setCurrentPrependFileTree(false);
                 }
-            }
-        } else {
-            if (isMountedRef.current) {
-                setCurrentSelectedFormat('markdown');
-                setCurrentPrependFileTree(false);
             }
         }
     }, [selectedProjectId]);
@@ -141,9 +138,7 @@ export function useAggregator({ treeData, selectedPaths, selectedProjectId }: Us
         if (isMountedRef.current) setCurrentSelectedFormat(format);
         if (selectedProjectId && selectedProjectId > 0) {
             const newSettings: AggregatorSettings = { format, prependTree: currentPrependFileTree };
-            try {
-                localStorage.setItem(`ccb_agg_settings_${selectedProjectId}`, JSON.stringify(newSettings));
-            } catch (e) { console.error("Failed to save aggregator format to localStorage", e); }
+            localStorage.setItem(`ccb_agg_settings_${selectedProjectId}`, JSON.stringify(newSettings));
         }
     }, [selectedProjectId, currentPrependFileTree]);
 
@@ -151,9 +146,7 @@ export function useAggregator({ treeData, selectedPaths, selectedProjectId }: Us
         if (isMountedRef.current) setCurrentPrependFileTree(prepend);
         if (selectedProjectId && selectedProjectId > 0) {
             const newSettings: AggregatorSettings = { format: currentSelectedFormat, prependTree: prepend };
-            try {
-                localStorage.setItem(`ccb_agg_settings_${selectedProjectId}`, JSON.stringify(newSettings));
-            } catch (e) { console.error("Failed to save aggregator prependTree to localStorage", e); }
+            localStorage.setItem(`ccb_agg_settings_${selectedProjectId}`, JSON.stringify(newSettings));
         }
     }, [selectedProjectId, currentSelectedFormat]);
 
@@ -162,14 +155,12 @@ export function useAggregator({ treeData, selectedPaths, selectedProjectId }: Us
         currentMarkDownDepth: number,
         formatToUse: OutputFormat,
         projectRootPath: string,
-        fileContentsMap: BatchFileContentsResponse // Pass the map of fetched contents
+        fileContentsMap: BatchFileContentsResponse
     ): Promise<string> => {
         let builtContent = "";
     
         const relevantChildren = currentNode.children?.filter(child => {
-            if (!child.is_dir) {
-                return selectedPaths.has(child.path);
-            }
+            if (!child.is_dir) return selectedPaths.has(child.path);
             return isDirRelevantForAggregation(child, selectedPaths);
         }) || [];
     
@@ -181,28 +172,22 @@ export function useAggregator({ treeData, selectedPaths, selectedProjectId }: Us
     
         for (const childNode of relevantChildren) {
             const displayPath = getRelativePath(childNode.path, projectRootPath);
-
             if (!childNode.is_dir) {
                 const lang = getLanguageFromPath(childNode.path);
                 const fileResult = fileContentsMap[childNode.path];
                 let fileContentText: string;
 
-                if (fileResult) {
-                    if ('Ok' in fileResult) {
-                        fileContentText = fileResult.Ok;
-                    } else { // 'Err' in fileResult
-                        fileContentText = `// Error reading file (${childNode.name}): ${fileResult.Err}`;
-                        console.warn(`Error fetching content for ${childNode.path}: ${fileResult.Err}`);
-                    }
+                if (typeof fileResult === 'string') {
+                    fileContentText = fileResult;
+                } else if (fileResult && 'Ok' in fileResult) {
+                    fileContentText = fileResult.Ok;
                 } else {
-                    fileContentText = `// Error: Content for ${childNode.name} not found in batch response.`;
-                    console.warn(`Content for ${childNode.path} was expected but not found in batch response.`);
+                    const errorMsg = fileResult && 'Err' in fileResult ? fileResult.Err : 'Content not found';
+                    fileContentText = `// Error reading file (${childNode.name}): ${errorMsg}`;
                 }
                 builtContent += formatFileContent(displayPath, childNode.name, fileContentText, formatToUse, currentMarkDownDepth, lang);
-
-            } else { // Directory
+            } else {
                 builtContent += formatFolderHeader(childNode.name, displayPath, formatToUse, currentMarkDownDepth);
-                // Recursive call, passing down the map
                 builtContent += await buildAggregatedContentRecursive(childNode, currentMarkDownDepth + 1, formatToUse, projectRootPath, fileContentsMap);
                 builtContent += formatFolderFooter(formatToUse, currentMarkDownDepth);
             }
@@ -216,30 +201,24 @@ export function useAggregator({ treeData, selectedPaths, selectedProjectId }: Us
             setError(null);
             setCopySuccess(false);
         }
-        let textForPrependedTree = '';
-        let aggregatedCoreContent = '';
-        let fileContentsMap: BatchFileContentsResponse = {};
-
+        
         if (!treeData) {
-  if (isMountedRef.current) {
-    setAggregatedText('');
-    setTokenCount(0);
-    setIsLoading(false);
-  }
-  try {
-    window.dispatchEvent(new CustomEvent('agg-token-count', {
-      detail: { tokenCount: 0, projectId: selectedProjectId ?? undefined },
-    }));
-  } catch {}
-  return;
-}
+          if (isMountedRef.current) {
+            setAggregatedText('');
+            setTokenCount(0);
+            setIsLoading(false);
+          }
+          window.dispatchEvent(new CustomEvent('agg-token-count', { detail: { tokenCount: 0, projectId: selectedProjectId ?? undefined } }));
+          return;
+        }
+
         const formatToUse = currentSelectedFormat;
         const prependToUse = currentPrependFileTree;
         const projectRootAbsolutePath = treeData.path; 
-
-        if (prependToUse) {
-            textForPrependedTree = generateFullScannedFileTree(treeData, formatToUse);
-        }
+        
+        let textForPrependedTree = prependToUse ? generateFullScannedFileTree(treeData, formatToUse) : '';
+        let aggregatedCoreContent = '';
+        let fileContentsMap: BatchFileContentsResponse = {};
 
         const pathsToFetchSet = new Set<string>();
         if (selectedPaths.size > 0) {
@@ -249,107 +228,69 @@ export function useAggregator({ treeData, selectedPaths, selectedProjectId }: Us
 
         if (uniquePathsToFetch.length > 0) {
             try {
-                console.log(`[Aggregator] Fetching content for ${uniquePathsToFetch.length} files in batch.`);
-                fileContentsMap = await invoke<BatchFileContentsResponse>("read_multiple_file_contents", { paths: uniquePathsToFetch });
+                // Correctly use the `compress` prop
+                if (compress) {
+                  fileContentsMap = await invoke<BatchFileContentsResponse>(
+                    "read_multiple_file_contents_compressed",
+                    { paths: uniquePathsToFetch, options: { remove_comments: !!removeComments } }
+                  );
+                } else {
+                  fileContentsMap = await invoke<BatchFileContentsResponse>("read_multiple_file_contents", { paths: uniquePathsToFetch });
+                }
             } catch (batchError) {
                 const errMsg = batchError instanceof Error ? batchError.message : String(batchError);
-                console.error("Error invoking read_multiple_file_contents:", errMsg);
                 if (isMountedRef.current) setError(`Failed to fetch file contents: ${errMsg}`);
                 uniquePathsToFetch.forEach(p => {
-                    if (!fileContentsMap[p]) { 
-                        fileContentsMap[p] = { Err: `Batch read command failed: ${errMsg}` };
-                    }
+                    fileContentsMap[p] = { Err: `Batch read command failed: ${errMsg}` };
                 });
             }
         }
         
-        if (!isMountedRef.current) return; // Check before proceeding with content building
+        if (!isMountedRef.current) return;
 
         if (selectedPaths.size > 0) {
-            if (treeData.is_dir) {
-                let rootLevelDepth = 1;
-                const rootDisplayPath = treeData.name.endsWith('/') ? treeData.name : `${treeData.name}/`;
-
-                if (isDirRelevantForAggregation(treeData, selectedPaths)) {
-                    aggregatedCoreContent += formatFolderHeader(treeData.name, rootDisplayPath, formatToUse, rootLevelDepth);
-                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth + 1, formatToUse, projectRootAbsolutePath, fileContentsMap);
-                    aggregatedCoreContent += formatFolderFooter(formatToUse, rootLevelDepth);
-                } else {
-                    aggregatedCoreContent += await buildAggregatedContentRecursive(treeData, rootLevelDepth, formatToUse, projectRootAbsolutePath, fileContentsMap);
-                }
-
-            } else if (selectedPaths.has(treeData.path)) { 
-                const lang = getLanguageFromPath(treeData.path);
-                const fileResult = fileContentsMap[treeData.path];
-                let fileContentText: string;
-                if (fileResult) {
-                    if ('Ok' in fileResult) fileContentText = fileResult.Ok;
-                    else fileContentText = `// Error reading file (${treeData.name}): ${fileResult.Err}`;
-                } else {
-                     fileContentText = `// Error: Content for ${treeData.name} not found in batch response (root file).`;
-                }
-                aggregatedCoreContent += formatFileContent(treeData.name, treeData.name, fileContentText, formatToUse, 1, lang);
-            }
+            aggregatedCoreContent = await buildAggregatedContentRecursive(treeData, 1, formatToUse, projectRootAbsolutePath, fileContentsMap);
         }
         
-        let finalOutput = '';
-        if (textForPrependedTree.length > 0) {
-            finalOutput += textForPrependedTree;
-            if (aggregatedCoreContent.length > 0) {
-                finalOutput += "\n\n" + aggregatedCoreContent;
-            }
-        } else {
-            finalOutput = aggregatedCoreContent;
-        }
+        let finalOutput = textForPrependedTree.length > 0 ? `${textForPrependedTree}\n\n${aggregatedCoreContent}` : aggregatedCoreContent;
         
         if (formatToUse === 'markdown' && finalOutput.endsWith('---\n\n')) {
             finalOutput = finalOutput.slice(0, -5);
-        } else if (formatToUse === 'xml' && finalOutput.length > 0 && !finalOutput.endsWith('\n')) {
-            finalOutput += '\n';
         }
-
+        
         if (isMountedRef.current) setAggregatedText(finalOutput);
 
         if (finalOutput) {
-  let computedCount = 0;
-  try {
-    computedCount = await invoke<number>("get_text_token_count", { text: finalOutput });
-  } catch (tokenError) {
-    console.error("Failed to get token count:", tokenError);
-    if (isMountedRef.current) {
-      setTokenCount(0);
-      const err = tokenError instanceof Error ? tokenError.message : String(tokenError);
-      setError(prev => (prev ? prev + "\n" : "") + `Token count failed: ${err}`);
-    }
-  }
-
-  if (isMountedRef.current) setTokenCount(computedCount);
-  try {
-    window.dispatchEvent(
-      new CustomEvent('agg-token-count', {
-        detail: { tokenCount: computedCount, projectId: selectedProjectId ?? undefined },
-      })
-    );
-  } catch {}
-} else {
-  if (isMountedRef.current) setTokenCount(0);
-  try {
-    window.dispatchEvent(
-      new CustomEvent('agg-token-count', {
-        detail: { tokenCount: 0, projectId: selectedProjectId ?? undefined },
-      })
-    );
-  } catch {}
-}
-
-        
+            try {
+                const computedCount = await invoke<number>("get_text_token_count", { text: finalOutput });
+                if (isMountedRef.current) setTokenCount(computedCount);
+                window.dispatchEvent(new CustomEvent('agg-token-count', { detail: { tokenCount: computedCount, projectId: selectedProjectId ?? undefined } }));
+            } catch (tokenError) {
+                 if (isMountedRef.current) {
+                    setTokenCount(0);
+                    setError(prev => (prev ? prev + "\n" : "") + `Token count failed.`);
+                 }
+            }
+        } else {
+          if (isMountedRef.current) setTokenCount(0);
+          window.dispatchEvent(new CustomEvent('agg-token-count', { detail: { tokenCount: 0, projectId: selectedProjectId ?? undefined } }));
+        }
 
         if (isMountedRef.current) setIsLoading(false);
-    }, [treeData, selectedPaths, currentSelectedFormat, currentPrependFileTree, buildAggregatedContentRecursive]);
+    }, [
+      treeData,
+      selectedPaths,
+      currentSelectedFormat,
+      currentPrependFileTree,
+      buildAggregatedContentRecursive,
+      compress, // Corrected dependency
+      removeComments,
+      selectedProjectId
+    ]);
+
 
     useEffect(() => {
         generateAggregatedText().catch(err => {
-            console.error("Error in generateAggregatedText effect:", err);
             if(isMountedRef.current) setError(`Aggregation failed: ${err instanceof Error ? err.message : String(err)}`);
         });
     }, [generateAggregatedText]);
@@ -362,10 +303,7 @@ export function useAggregator({ treeData, selectedPaths, selectedProjectId }: Us
             window.dispatchEvent(new CustomEvent('global-copy-success'));
             setTimeout(() => { if (isMountedRef.current) setCopySuccess(false); }, 1500);
         } catch (err) {
-            console.error("Failed to copy to clipboard:", err);
-            const errorMsg = err instanceof Error ? err.message : String(err);
-            if (isMountedRef.current) setError(`Failed to copy: ${errorMsg}`);
-            alert("Failed to copy text. See console for details.");
+            if (isMountedRef.current) setError(`Failed to copy.`);
         }
     }, [aggregatedText, isLoading]);
 

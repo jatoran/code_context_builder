@@ -13,6 +13,7 @@ mod utils;
 mod file_monitor;
 mod app_settings; // Correct location
 mod ignore_handler;
+mod compress; // + add this
 
 // Import necessary items
 use db::{AppState, init_connection, init_db_tables};
@@ -120,7 +121,8 @@ fn main() {
             file_monitor::start_monitoring_project_cmd,
             file_monitor::stop_monitoring_project_cmd,
             app_settings::get_app_setting_cmd,
-            app_settings::set_app_setting_cmd
+            app_settings::set_app_setting_cmd,
+            compress::read_multiple_file_contents_compressed, // <-- NEW
         ])
         .run(context)
         .expect("error while running tauri application");

@@ -1,16 +1,21 @@
 
 // src/components/CodeContextBuilder/Aggregator/Aggregator.tsx
-import React, { useEffect } from 'react'; // Added useEffect
+import React, { useEffect, useState } from 'react';
 import { FileNode } from '../../../types/scanner';
-import { useAggregator, OutputFormat } from '../../../hooks/useAggregator'; // Import the hook
+import { useAggregator, OutputFormat } from '../../../hooks/useAggregator';
 
 interface AggregatorProps {
     selectedPaths: Set<string>;
     treeData: FileNode | null; 
-    selectedProjectId: number | null; // Added selectedProjectId
+    selectedProjectId: number | null;
 }
 
 const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, selectedProjectId }) => {
+    
+    // State for the simplified toggles
+    const [enableCompression, setEnableCompression] = useState(false);
+    const [stripComments, setStripComments] = useState(true);
+
     const {
         aggregatedText,
         tokenCount,
@@ -22,9 +27,16 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, select
         setPrependFileTree,
         handleCopyToClipboard,
         copySuccess,
-    } = useAggregator({ treeData, selectedPaths, selectedProjectId }); // Pass selectedProjectId
+    } = useAggregator({
+      treeData,
+      selectedPaths,
+      selectedProjectId,
+      // Pass the simplified options to the hook
+      compress: enableCompression,
+      removeComments: stripComments,
+    });
 
-    // NEW: respond to quick-control events
+    // This effect responds to quick-controls from the main App view
     useEffect(() => {
         const onSetFormat = (e: Event) => {
         const { format } = (e as CustomEvent<{ format?: OutputFormat }>).detail || {};
@@ -45,7 +57,7 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, select
         };
     }, [setSelectedFormat, setPrependFileTree]);
 
-    // Listen for hotkey event to trigger copy
+    // This effect listens for the global copy hotkey
     useEffect(() => {
         const triggerCopy = () => {
             if (typeof handleCopyToClipboard === 'function') {
@@ -64,34 +76,63 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, select
         <>
             <div className="aggregator-header">
                 <h3>Aggregated Context</h3>
-                <div className="aggregator-controls">
-                    <div className="control-item">
-                        <label htmlFor="formatSelect">Format:</label>
-                        <select
-                            id="formatSelect"
-                            value={selectedFormat}
-                            onChange={(e) => setSelectedFormat(e.target.value as OutputFormat)}
-                            disabled={isLoading}
-                        >
-                            <option value="markdown">Markdown</option>
-                            <option value="xml">XML</option>
-                            <option value="raw">Raw</option>
-                        </select>
+                <div className="aggregator-controls" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '0.8em'}}>
+                    {/* First row of controls */}
+                    <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.8em', alignItems: 'center'}}>
+                        <div className="control-item">
+                            <label htmlFor="formatSelect">Format:</label>
+                            <select
+                                id="formatSelect"
+                                value={selectedFormat}
+                                onChange={(e) => setSelectedFormat(e.target.value as OutputFormat)}
+                                disabled={isLoading}
+                            >
+                                <option value="markdown">Markdown</option>
+                                <option value="xml">XML</option>
+                                <option value="raw">Raw</option>
+                            </select>
+                        </div>
+                        <div className="control-item">
+                            <input
+                                type="checkbox"
+                                id="prependTree"
+                                checked={prependFileTree}
+                                onChange={(e) => setPrependFileTree(e.target.checked)}
+                                disabled={isLoading}
+                            />
+                            <label htmlFor="prependTree">Prepend Tree</label>
+                        </div>
+                         <span className="aggregator-stats-display">
+                            {selectedPaths.size} file{selectedPaths.size === 1 ? '' : 's'} |
+                            ~{tokenCount.toLocaleString()} tokens
+                        </span>
                     </div>
-                    <div className="control-item">
-                        <input
-                            type="checkbox"
-                            id="prependTree"
-                            checked={prependFileTree}
-                            onChange={(e) => setPrependFileTree(e.target.checked)}
-                            disabled={isLoading}
-                        />
-                        <label htmlFor="prependTree">Prepend Tree</label>
+
+                    {/* Second row for Smart Compression settings */}
+                    <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.8em', alignItems: 'center'}}>
+                        <div className="control-item">
+                            <input
+                                type="checkbox"
+                                id="enableCompression"
+                                checked={enableCompression}
+                                onChange={(e) => setEnableCompression(e.target.checked)}
+                                disabled={isLoading}
+                                title="Enable smart compression for supported file types (e.g., .py, .tsx)"
+                            />
+                            <label htmlFor="enableCompression">Enable Smart Compression</label>
+                        </div>
+                        <div className="control-item">
+                            <input
+                                type="checkbox"
+                                id="stripComments"
+                                checked={stripComments}
+                                onChange={(e) => setStripComments(e.target.checked)}
+                                disabled={isLoading || !enableCompression}
+                                title={!enableCompression ? "Enable smart compression first" : "Remove code comments from supported files"}
+                            />
+                            <label htmlFor="stripComments" style={{opacity: enableCompression ? 1 : 0.5}}>Remove comments</label>
+                        </div>
                     </div>
-                     <span className="aggregator-stats-display">
-                        {selectedPaths.size} file{selectedPaths.size === 1 ? '' : 's'} selected |
-                        ~{tokenCount.toLocaleString()} tokens
-                    </span>
                 </div>
             </div>
 
@@ -120,7 +161,7 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, select
                         transition: 'background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease'
                     }}
                 >
-                    {copySuccess ? 'Copied!' : 'Copy Aggregated'}
+                    {copySuccess ? 'Copied!' : 'Copy to Clipboard'}
                 </button>
             </div>
         </>
