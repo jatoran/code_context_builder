@@ -1,5 +1,3 @@
-
-
 /* src/App.css */
 
 :root {
@@ -229,7 +227,7 @@ html, body, #root {
 
 /* Left Panel (Project Manager + Aggregator) */
 .left-panel {
-  width: 380px; 
+  /* width is now controlled by inline style */
   min-width: 300px; 
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -238,15 +236,16 @@ html, body, #root {
   box-sizing: border-box;
   flex-shrink: 0;
   background-color: var(--left-panel-bg-color);
-  transition: width 0.3s ease-in-out, min-width 0.3s ease-in-out, padding 0.3s ease-in-out;
+  transition: min-width 0.3s ease-in-out, padding 0.3s ease-in-out; /* Removed width from transition */
   overflow: hidden; 
 }
 .left-panel.collapsed {
-  width: 0px;
+  width: 0px !important; /* Use !important to override inline style during collapse */
   min-width: 0px;
   padding-left: 0; 
   padding-right: 0;
   border-right: none;
+  transition: width 0.3s ease-in-out, min-width 0.3s ease-in-out, padding 0.3s ease-in-out; /* Add width back for collapse animation */
 }
 .left-panel > div { 
     padding: 1em;
@@ -485,8 +484,28 @@ label { display: block; margin-bottom: 0.2em; font-size: 0.9em; color: var(--lab
 .project-manager { display: flex; flex-direction: column; gap: 0.8em; }
 .project-manager h3 { margin-bottom: 0.5em; font-size: 1.1em; }
 
-.pm-row-select { width: 100%; margin-bottom: 0.5em; }
-.pm-row-select select { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.9em; }
+/* NEW: Combines label, select, and save status into one row */
+.pm-project-selector-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  width: 100%;
+}
+.pm-project-selector-row label {
+  font-size: 0.9em;
+  color: var(--label-text-color);
+  margin-bottom: 0;
+  flex-shrink: 0; /* Do not squish the "Project:" label */
+}
+.pm-project-selector-row select {
+  flex-grow: 1; /* Allow select to take available space */
+  padding: 0.4rem 0.6rem;
+  font-size: 0.9em;
+}
+.pm-project-selector-row .save-status {
+  margin-left: 0; /* Override any previous margin */
+  flex-shrink: 0;
+}
 
 .pm-row-buttons { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 0.5em; }
 .pm-buttons-group-left { display: flex; gap: 0.5em; align-items: center; }
@@ -607,12 +626,22 @@ html.theme-light .save-status.error {
 .aggregator-controls .control-item label { display: inline-block; margin-bottom: 0; font-size: 0.9em; color: var(--label-text-color); white-space: nowrap; }
 .aggregator-controls .control-item select { padding: 0.3em 0.5em; font-size: 0.9em; margin: 0; }
 .aggregator-controls .control-item input[type="checkbox"] { padding: 0; margin: 0 0.2em 0 0; width: auto; height: auto; vertical-align: middle; }
-.aggregator-stats-display { font-size: 0.9em; color: var(--label-text-color); margin-left: auto; white-space: nowrap; padding-left: 0.5em; }
+.aggregator-stats-display { font-size: 0.9em; color: var(--label-text-color); white-space: nowrap; }
 
-.aggregator-content { flex-grow: 1; width: 100%; box-sizing: border-box; background-color: var(--input-background-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5em; font-size: 0.9em; overflow: auto; resize: none; font-family: monospace; white-space: pre; }
+.aggregator-content { flex-grow: 1; width: 100%; box-sizing: border-box; background-color: var(--input-background-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5em; font-size: 0.9em; overflow: auto; resize: none; font-family: monospace; white-space: pre-wrap; }
 .aggregator-content::placeholder { color: #888; font-style: italic; }
-.aggregator-actions { text-align: right; margin-top: 0.5em; flex-shrink: 0; }
-.aggregator-actions button { margin-left: 0.5em; padding: 0.5rem 1rem; }
+.aggregator-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1em;
+  margin-top: 0.5em;
+  flex-shrink: 0;
+}
+.aggregator-actions button {
+  margin-left: 0;
+  padding: 0.5rem 1rem;
+}
 
 /* --------------------------------------------------------------------------
    Status Bar (Bottom of app-container)
@@ -897,7 +926,6 @@ html.theme-light .save-status.error {
 .mt-1 { margin-top: 0.5rem; } .mt-2 { margin-top: 1rem; }
 .mb-1 { margin-bottom: 0.5rem; } .mb-2 { margin-bottom: 1rem; }
 
-/* App.css */
 .agg-quick-controls {
   display: flex;
   align-items: center;
@@ -907,8 +935,293 @@ html.theme-light .save-status.error {
 }
 
 
-/* REMOVED @media (prefers-color-scheme: light) block that used :root here, 
-   as theme variables are now controlled by html.theme-light class */
+
+/*  */
+
+/* Make aggregator panel a flex container to manage child element sizing */
+.left-panel-aggregator {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto; /* Allow scrolling when content is too tall */
+  padding: 0 0.5em 0.5em 0.5em;
+  flex-grow: 1; /* Allow this panel to take up remaining vertical space */
+}
+
+.aggregator-header,
+.aggregator-presets,
+.aggregator-preamble,
+.aggregator-query,
+.aggregator-actions {
+  flex-shrink: 0; /* Prevent these sections from shrinking */
+}
+
+/* This block will make the context area grow */
+.aggregator-context-block {
+  flex-grow: 1; /* Allow this block to take all available vertical space */
+  display: flex;
+  flex-direction: column;
+  min-height: 100px; /* Give it a sensible minimum height */
+  margin-top: 0.5em; /* Add some space above the context block */
+}
+
+/* Make the textarea itself fill its parent container */
+.aggregator-content {
+  flex-grow: 1;
+  resize: vertical;
+}
+
+/* Styles for the inline label + tag input */
+.aggregator-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.3em;
+}
+
+.aggregator-section-header > label { /* Target the main section label */
+  font-size: 0.9em;
+  font-weight: 500;
+  color: var(--label-text-color);
+}
+
+/* NEW: Container for the inline Tag: label and input */
+.tag-editor {
+  display: flex;
+  align-items: center;
+  gap: 0.4em; /* Space between "Tag:" and the input box */
+}
+
+/* NEW: Style for the small "Tag:" label */
+.tag-editor-label {
+  font-size: 0.8em;
+  color: var(--label-text-color);
+  margin: 0;
+}
+
+.wrapper-tag-input {
+  font-family: monospace;
+  font-size: 0.9em;
+  text-align: center;
+  max-width: 120px;
+  padding: 2px 4px;
+  border: 1px solid var(--border-color);
+  background-color: var(--input-background-color);
+  color: var(--text-color);
+  border-radius: 3px;
+}
+
+/* --- Preset styles --- */
+.aggregator-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  padding-bottom: 0.5em;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 0.5em;
+}
+
+.aggregator-presets > label { /* Target the "Prompt Preset:" label */
+  font-size: 0.9em;
+  font-weight: 500;
+  color: var(--label-text-color);
+}
+
+.preset-controls,
+.preset-save-controls {
+  display: flex;
+  gap: 0.5em;
+}
+
+.preset-controls select,
+.preset-save-controls input {
+  flex-grow: 1;
+}
+
+.delete-preset-btn {
+  padding: 0 0.5em;
+  background-color: transparent;
+  /* border: 1px solid var(--danger-color); */
+  color: var(--danger-color);
+  cursor: pointer;
+}
+
+.delete-preset-btn:hover {
+  background-color: var(--danger-color);
+  color: #fff;
+}
 
 
-  
+
+/* NEW: Temporarily hide children during animation for performance */
+.left-panel.animating > * {
+  display: none;
+}
+
+
+/* --- NEW: Draggable Divider --- */
+.resize-handle {
+  width: 5px;
+  flex-shrink: 0;
+  background-color: transparent;
+  cursor: col-resize;
+  transition: background-color 0.2s ease-in-out;
+  position: relative;
+}
+/* Visual indicator on hover */
+.resize-handle:hover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 1px;
+  width: 3px;
+  height: 100%;
+  background-color: var(--accent-color);
+}
+/* Styles for light theme */
+html.theme-light .resize-handle {
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  width: 6px; /* Slightly wider to accommodate borders */
+}
+html.theme-light .resize-handle:hover::after {
+  left: 1px;
+  width: 2px;
+}
+
+/* --- NEW: Styles for Collapsible Section in Aggregator --- */
+.collapsible-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em; /* Space between header and content when open */
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.collapsible-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.collapsible-section-header h4 {
+  margin: 0;
+  font-size: 1em;
+  font-weight: 500;
+  color: var(--label-text-color);
+}
+
+.collapsible-section-header:hover h4 {
+  color: var(--text-color);
+}
+
+.collapsible-toggle {
+  font-size: 0.8em;
+  color: var(--label-text-color);
+}
+
+.collapsible-section-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8em; /* Space between presets, pre-prompt, and post-prompt */
+}
+
+/* Refined preset controls layout */
+.preset-save-controls {
+  display: flex;
+  gap: 0.5em;
+}
+
+.preset-save-controls input {
+  flex-grow: 1;
+}
+
+.preset-save-controls button {
+  flex-shrink: 0;
+  min-width: 120px; /* Give save/update button a consistent width */
+  text-align: center;
+}
+
+/* ... existing styles ... */
+
+/* --- NEW: Styles for Format Instruction Editor in Settings Modal --- */
+.format-instruction-tabs {
+  display: flex;
+  gap: 0.5em;
+  margin-bottom: 0.5em;
+  border-bottom: 1px solid var(--settings-modal-header-border);
+}
+
+.tab-btn {
+  padding: 0.5em 1em;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  background-color: transparent;
+  color: var(--label-text-color);
+  margin-bottom: -1px; /* Overlap the container's border */
+}
+
+.tab-btn:hover {
+  background-color: var(--card-bg-color);
+  color: var(--text-color);
+}
+
+.tab-btn.active {
+  background-color: var(--card-bg-color2);
+  border-color: var(--settings-modal-header-border);
+  color: var(--text-color);
+  font-weight: 500;
+}
+
+html.theme-light .tab-btn.active {
+  background-color: var(--bg-color);
+}
+
+.format-instruction-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 100px;
+  font-size: 0.9em;
+}
+
+
+.control-item { 
+    display: flex; 
+    align-items: center; 
+    gap: 0.4em; 
+}
+/* This rule now correctly targets labels inside ANY .control-item, fixing the layout issue. */
+.control-item label { 
+    display: inline-block; 
+    margin-bottom: 0; 
+    font-size: 0.9em; 
+    color: var(--label-text-color); 
+    white-space: nowrap; 
+}
+
+.aggregator-controls .control-item select { padding: 0.3em 0.5em; font-size: 0.9em; margin: 0; }
+.aggregator-controls .control-item input[type="checkbox"] { padding: 0; margin: 0 0.2em 0 0; width: auto; height: auto; vertical-align: middle; }
+.aggregator-stats-display { font-size: 0.9em; color: var(--label-text-color); white-space: nowrap; }
+
+/* ... existing styles for aggregator-content, aggregator-actions, etc. ... */
+
+/* --- NEW: Style for the prompt options container --- */
+.prompt-options {
+  padding-bottom: 0.8em;
+  border-bottom: 1px solid var(--border-color);
+}
+
+
+/* --- Styles for Collapsible Section in Aggregator --- */
+.collapsible-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em; /* Space between header and content when open */
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5em;
+  margin-bottom: 0.5em;
+}

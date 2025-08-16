@@ -178,27 +178,8 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
 
   return (
     <div className="project-manager">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '1.2em' }}>
-        <label
-            htmlFor="projectSelectorDropdown"
-            style={{
-                fontSize: '0.9em',
-                color: 'var(--label-text-color)',
-                marginBottom: '0'
-            }}
-        >
-          Project:
-        </label>
-        {projectSelected && (
-          <span
-            className={`save-status ${saveStatus} ${saveStatus !== 'idle' ? 'visible' : ''}`}
-          >
-            {getSaveStatusMessage()}
-          </span>
-        )}
-      </div>
-
-      <div className="pm-row-select">
+      <div className="pm-project-selector-row">
+        <label htmlFor="projectSelectorDropdown">Project:</label>
         <select
           id="projectSelectorDropdown"
           value={selectedProjectId}
@@ -213,6 +194,13 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
             </option>
           ))}
         </select>
+        {projectSelected && (
+          <span
+            className={`save-status ${saveStatus} ${saveStatus !== 'idle' ? 'visible' : ''}`}
+          >
+            {getSaveStatusMessage()}
+          </span>
+        )}
       </div>
 
       <div className="pm-row-buttons">

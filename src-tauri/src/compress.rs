@@ -1,21 +1,17 @@
-
 // src-tauri/src/compress.rs
+use rayon::prelude::*; // Import Rayon for parallel processing
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use tree_sitter::{Language, Node, Parser, Query, QueryCursor};
+use tree_sitter::{Node, Parser, Query, QueryCursor};
 
 // --- Types for Tauri Command ---
 
-#[derive(Serialize)]
-#[serde(untagged)]
-pub enum FileResult {
-    Ok(String),
-    Err(String),
-}
+// THE FAULTY FileResult ENUM HAS BEEN REMOVED.
 
 #[derive(Deserialize, Default, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
 pub struct SmartCompressOptions {
     pub remove_comments: bool,
 }
@@ -163,28 +159,16 @@ impl Compressor for TsxCompressor {
         
         let query_text = r#"
             (comment) @comment
-
-            ; Find the implementation body of a hook's callback
             (call_expression
               function: (identifier) @hook_name (#match? @hook_name "^use(Callback|Memo|Effect)$")
-              arguments: (arguments
-                (arrow_function
-                  body: (statement_block) @body
-                )
-              )
-            )
-
-            ; Find the implementation body of any non-component function
+              arguments: (arguments (arrow_function body: (statement_block) @body)))
             (function_declaration
               name: (identifier) @func_name (#not-match? @func_name "^[A-Z]")
-              body: (statement_block) @body
-            )
+              body: (statement_block) @body)
             (lexical_declaration
               (variable_declarator
                 name: (identifier) @func_name (#not-match? @func_name "^[A-Z]")
-                value: (arrow_function body: (statement_block) @body)
-              )
-            )
+                value: (arrow_function body: (statement_block) @body)))
         "#;
         
         let query = Query::new(language, query_text).unwrap();
@@ -193,34 +177,21 @@ impl Compressor for TsxCompressor {
 
         for m in matches {
             let mut captured_body: Option<Node> = None;
-
             for cap in m.captures {
                 let capture_name = &query.capture_names()[cap.index as usize];
                 match capture_name.as_str() {
                     "comment" => {
                         if opts.remove_comments {
-                            edits.push(Edit {
-                                start: cap.node.start_byte(),
-                                end: cap.node.end_byte(),
-                                replacement: String::new(),
-                            });
+                            edits.push(Edit { start: cap.node.start_byte(), end: cap.node.end_byte(), replacement: String::new() });
                         }
                     },
                     "body" => captured_body = Some(cap.node),
                     _ => (),
                 }
             }
-
             if let Some(body_node) = captured_body {
-                 // Don't prune if it's already empty or just a placeholder
-                if body_node.named_child_count() == 0 && body_node.child_count() <= 2 {
-                    continue;
-                }
-                edits.push(Edit {
-                    start: body_node.start_byte(),
-                    end: body_node.end_byte(),
-                    replacement: "{ ... }".to_string(),
-                });
+                if body_node.named_child_count() == 0 && body_node.child_count() <= 2 { continue; }
+                edits.push(Edit { start: body_node.start_byte(), end: body_node.end_byte(), replacement: "{ ... }".to_string() });
             }
         }
         
@@ -249,28 +220,32 @@ fn get_compressor_for_path(path: &str) -> Option<Box<dyn Compressor + Send + Syn
 
 // --- Tauri Command ---
 
+// --- THIS IS THE CORRECTED COMMAND ---
+// It now returns the same data shape as the non-compressed version and uses Rayon for performance.
 #[tauri::command]
 pub fn read_multiple_file_contents_compressed(
     paths: Vec<String>,
     options: Option<SmartCompressOptions>,
-) -> Result<HashMap<String, FileResult>, String> {
+) -> Result<HashMap<String, Result<String, String>>, String> {
     let opts = options.unwrap_or_default();
-    let mut map = HashMap::new();
 
-    for p in paths {
-        match fs::read_to_string(&p) {
-            Ok(raw) => {
-                let compressed_content = if let Some(compressor) = get_compressor_for_path(&p) {
-                    compressor.compress(&raw, &opts)
-                } else {
-                    raw // No compressor for this file type, return original content
-                };
-                map.insert(p, FileResult::Ok(compressed_content));
-            }
-            Err(e) => {
-                map.insert(p.clone(), FileResult::Err(e.to_string()));
-            }
-        }
-    }
-    Ok(map)
+    let results: HashMap<String, Result<String, String>> = paths
+        .par_iter() // Use parallel iterator for performance
+        .map(|p_str| {
+            let result = match fs::read_to_string(p_str) {
+                Ok(raw_content) => {
+                    let final_content = if let Some(compressor) = get_compressor_for_path(p_str) {
+                        compressor.compress(&raw_content, &opts)
+                    } else {
+                        raw_content
+                    };
+                    Ok(final_content)
+                }
+                Err(e) => Err(e.to_string()),
+            };
+            (p_str.clone(), result)
+        })
+        .collect();
+
+    Ok(results)
 }

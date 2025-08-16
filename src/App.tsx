@@ -1,4 +1,3 @@
-
 // src/App.tsx
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import "./App.css";
@@ -15,7 +14,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { Window, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
 import { findNodeByPath as findNodeByPathUtil } from "./components/CodeContextBuilder/FileTree/fileTreeUtils";
-import { OutputFormat } from "./hooks/useAggregator"; // NEW
+import { OutputFormat } from "./hooks/useAggregator";
 
 interface ScanProgressPayload {
     progress: number;
@@ -105,12 +104,24 @@ function App() {
     const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState<boolean>(() => {
         try { return localStorage.getItem('ccb_isLeftPanelCollapsed') === 'true'; } catch { return false; }
     });
+    const [isAnimatingSidebar, setIsAnimatingSidebar] = useState<boolean>(false);
     const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState<boolean>(false);
     const [outOfDateFilePaths, setOutOfDateFilePaths] = useState<Set<string>>(new Set());
     const [showGlobalCopySuccess, setShowGlobalCopySuccess] = useState<boolean>(false);
     const globalCopySuccessTimerRef = useRef<number | null>(null);
     const fileTreeRef = useRef<FileTreeRefHandles>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // --- NEW: State and refs for draggable divider ---
+    const [leftPanelWidth, setLeftPanelWidth] = useState<number>(() => {
+        try {
+            const savedWidth = localStorage.getItem('ccb_leftPanelWidth');
+            return savedWidth ? parseInt(savedWidth, 10) : 380;
+        } catch {
+            return 380;
+        }
+    });
+    const isResizing = useRef(false);
 
 /** Auto-clear search text a few seconds after blur if focus doesn't return */
 const searchClearTimerRef = useRef<number | null>(null);
@@ -124,7 +135,6 @@ const cancelSearchClearTimer = useCallback(() => {
 }, []);
 
 const scheduleSearchAutoClear = useCallback(() => {
-  // don't schedule if there's nothing to clear
   if (!searchTerm) return;
   cancelSearchClearTimer();
   searchClearTimerRef.current = window.setTimeout(() => {
@@ -141,7 +151,6 @@ const handleSearchInputBlur = useCallback(() => {
   scheduleSearchAutoClear();
 }, [scheduleSearchAutoClear]);
 
-// cleanup on unmount
 useEffect(() => {
   return () => cancelSearchClearTimer();
 }, [cancelSearchClearTimer]);
@@ -150,18 +159,15 @@ useEffect(() => {
 
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
     const [currentTheme, setCurrentTheme] = useState<ThemeSetting>('system');
-    // NEW: quick control state mirrors aggregator settings
     const [aggQuickFormat, setAggQuickFormat] = useState<OutputFormat>('markdown');
     const [aggQuickPrepend, setAggQuickPrepend] = useState<boolean>(false);
 
 const [aggTokenCount, setAggTokenCount] = useState<number>(0);
 
-// listen for token count emitted by Aggregator
 useEffect(() => {
   const handler = (e: Event) => {
     const d = (e as CustomEvent<{ tokenCount: number; projectId?: number }>).detail;
     if (!d) return;
-    // If Aggregator includes a projectId, ignore updates from another project
     if (selectedProjectId && d.projectId && d.projectId !== selectedProjectId) return;
     if (isMountedRef.current) setAggTokenCount(d.tokenCount || 0);
   };
@@ -169,7 +175,6 @@ useEffect(() => {
   return () => window.removeEventListener('agg-token-count', handler as EventListener);
 }, [selectedProjectId]);
 
-// aggregated stats from current selection
 const aggregatedStats = useMemo(() => {
   if (!treeData || selectedPaths.size === 0) {
     return { files: 0, folders: 0, lines: 0, tokens: 0 };
@@ -193,17 +198,15 @@ const aggregatedStats = useMemo(() => {
   return { files, folders: folders.size, lines, tokens };
 }, [treeData, selectedPaths]);
 
-// prefer the live Aggregator token count if we have one (fallback to sum of file tokens)
 const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
 
-    // Load aggregator settings for current project so quick controls reflect truth
     useEffect(() => {
         if (selectedProjectId > 0) {
         try {
             const raw = localStorage.getItem(`ccb_agg_settings_${selectedProjectId}`);
             if (raw) {
             const parsed = JSON.parse(raw);
-            setAggQuickFormat(['markdown','xml','raw'].includes(parsed?.format) ? parsed.format : 'markdown');
+            setAggQuickFormat(['markdown','xml','raw', 'sentinel'].includes(parsed?.format) ? parsed.format : 'markdown');
             setAggQuickPrepend(!!parsed?.prependTree);
             } else {
             setAggQuickFormat('markdown');
@@ -219,7 +222,6 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
         }
     }, [selectedProjectId]);
 
-    // Helpers to update both local state + aggregator (via events) + persist
     const persistAggSettings = useCallback((fmt: OutputFormat, prep: boolean) => {
         if (selectedProjectId > 0) {
         try {
@@ -245,7 +247,6 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
 
     useEffect(() => { isMountedRef.current = true; return () => { isMountedRef.current = false; }; }, []);
 
-    // Load persisted theme setting on mount
     useEffect(() => {
         const loadThemeSetting = async () => {
             try {
@@ -255,13 +256,12 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
                 }
             } catch (err) {
                 console.error("Failed to load theme setting:", err);
-                if (isMountedRef.current) setCurrentTheme('system'); // Default on error
+                if (isMountedRef.current) setCurrentTheme('system');
             }
         };
         loadThemeSetting();
     }, []);
 
-    // Apply theme based on currentTheme state
     useEffect(() => {
         const root = document.documentElement;
         root.classList.remove('theme-light', 'theme-dark');
@@ -272,10 +272,10 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
             root.classList.add('theme-light');
         } else if (currentTheme === 'dark') {
             root.classList.add('theme-dark');
-        } else { // 'system'
+        } else { 
             mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
             const applySystemTheme = (isDark: boolean) => {
-                root.classList.remove('theme-light', 'theme-dark'); // Clear explicit themes
+                root.classList.remove('theme-light', 'theme-dark');
                 if (isDark) {
                     root.classList.add('theme-dark');
                 } else {
@@ -284,7 +284,7 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
             };
             applySystemTheme(mediaQuery.matches);
             handleChange = (e: MediaQueryListEvent) => {
-                if (currentTheme === 'system') { // Only react if still in system mode
+                if (currentTheme === 'system') {
                     applySystemTheme(e.matches);
                 }
             };
@@ -375,6 +375,44 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
         setupListeners().catch(err => console.error("Error in window geometry setupListeners:", err));
         return () => { localIsMountedRef.current = false; unlistenResize?.(); unlistenMove?.(); };
     }, []);
+
+    // --- NEW: Handlers and effect for draggable divider ---
+    useEffect(() => {
+        // Persist width on change, but debounced to avoid hammering localStorage
+        const handler = setTimeout(() => {
+            if (isMountedRef.current) {
+                localStorage.setItem('ccb_leftPanelWidth', String(leftPanelWidth));
+            }
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [leftPanelWidth]);
+    
+    const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        isResizing.current = true;
+    }, []);
+
+    const handleResizeMouseUp = useCallback(() => {
+        isResizing.current = false;
+    }, []);
+
+    const handleResizeMouseMove = useCallback((e: MouseEvent) => {
+        if (isResizing.current) {
+            // Constraints: min 300px, max 70% of window width
+            const newWidth = Math.max(300, Math.min(e.clientX, window.innerWidth * 0.7));
+            setLeftPanelWidth(newWidth);
+        }
+    }, []);
+
+    useEffect(() => {
+        window.addEventListener('mousemove', handleResizeMouseMove);
+        window.addEventListener('mouseup', handleResizeMouseUp);
+
+        return () => {
+            window.removeEventListener('mousemove', handleResizeMouseMove);
+            window.removeEventListener('mouseup', handleResizeMouseUp);
+        };
+    }, [handleResizeMouseMove, handleResizeMouseUp]);
 
     const [isMonitoringProject, setIsMonitoringProject] = useState<number | null>(null);
     const stopFileMonitoring = useCallback(async () => {
@@ -558,13 +596,10 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
     }, [loadProjects]);
 
     const handleDeleteCurrentProject = useCallback(async () => {
-        // Confirmation is now handled in ProjectManager.tsx before this is called.
         if (typeof invoke !== 'function') { 
             if (isMountedRef.current) setError("Cannot delete: API not ready."); 
             return; 
         }
-        // `selectedProjectId` is assumed to be valid and > 0 because ProjectManager
-        // would disable the delete button or prevent calling this otherwise.
 
         try {
             await invoke("delete_code_context_builder_project", { projectId: selectedProjectId });
@@ -572,7 +607,7 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
             localStorage.removeItem(`ccb_selectedPaths_${selectedProjectId}`); 
             localStorage.removeItem(`ccb_expandedPaths_${selectedProjectId}`);
             if (isMountedRef.current) {
-                 await loadProjects(); // Reload projects, which will update selection or show no projects.
+                 await loadProjects();
             }
         } catch (err) { 
             console.error("Error during delete process:", err);
@@ -580,7 +615,7 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
                 setError(`Delete process failed: ${err instanceof Error ? err.message : String(err)}`);
             }
         }
-    }, [selectedProjectId, loadProjects]); // projects dependency removed as projectToDelete lookup is no longer here.
+    }, [selectedProjectId, loadProjects]);
 
     const handleScanProject = useCallback(async () => {
         if (!selectedProjectId || isScanning || typeof invoke !== 'function') {
@@ -638,12 +673,18 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
     const handleOpenSettingsModal = useCallback(() => setIsSettingsModalOpen(true), []);
     const handleCloseSettingsModal = useCallback(() => setIsSettingsModalOpen(false), []);
 
-    // Callback for when import is complete, to refresh projects
     const handleImportComplete = useCallback(() => {
-        loadProjects(); // Reloads projects which will update the UI
-        // Optionally, could select the first newly imported project or last one.
-        // For now, just reloading the list is fine.
+        loadProjects();
     }, [loadProjects]);
+
+    const handleTogglePanel = useCallback(() => {
+        setIsAnimatingSidebar(true);
+        setIsLeftPanelCollapsed(current => !current);
+        // This timeout must match the transition duration in App.css
+        setTimeout(() => {
+            if(isMountedRef.current) setIsAnimatingSidebar(false);
+        }, 300); 
+    }, []);
 
 
     const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
@@ -662,32 +703,30 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
         } else if (event.ctrlKey && event.key.toLowerCase() === 'a' && !isInputFocused) { 
             event.preventDefault(); 
             if (treeData && isMountedRef.current) setSelectedPaths(new Set(getAllFilePaths(treeData))); 
-        } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'A' && !isInputFocused) { 
-            event.preventDefault(); 
-            if (isMountedRef.current) setSelectedPaths(new Set()); 
-        } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'X' && !isInputFocused) { 
-            event.preventDefault(); 
-            if (isMountedRef.current) setSelectedPaths(new Set()); 
-        } else if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 'x' && !isInputFocused) { 
-            event.preventDefault(); 
-            if (isMountedRef.current) setSelectedPaths(new Set()); 
+        } else if ((event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'A') && !isInputFocused) {
+            event.preventDefault();
+            if (isMountedRef.current) setSelectedPaths(new Set());
+        } else if (event.key.toLowerCase() === 'x' && (event.ctrlKey || event.metaKey) && !isInputFocused) {
+            // Note: Ctrl+X can be ambiguous, common for 'cut'. Using it for deselect all.
+            // Also accept Ctrl+Shift+A as a more explicit alternative.
+            event.preventDefault();
+            if (isMountedRef.current) setSelectedPaths(new Set());
         } else if (event.ctrlKey && event.key === 'ArrowDown' && !isInputFocused) {
             event.preventDefault();
-            fileTreeRef.current?.expandTreeLevel(true); // true for expand all
+            fileTreeRef.current?.expandTreeLevel(true);
         } else if (event.ctrlKey && event.key === 'ArrowUp' && !isInputFocused) {
             event.preventDefault();
-            fileTreeRef.current?.collapseTreeLevel(true); // true for collapse all
-        
-} else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'M') {
-  event.preventDefault();
-  const order: OutputFormat[] = ['markdown','xml','raw'];
-  const next = order[(order.indexOf(aggQuickFormat) + 1) % order.length];
-  handleQuickFormatChange(next);
-} else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'T') {
-  event.preventDefault();
-  handleQuickPrependChange(!aggQuickPrepend);
-}
-    }, [treeData, selectedProjectId, isScanning, handleScanProject, searchInputRef, fileTreeRef]); 
+            fileTreeRef.current?.collapseTreeLevel(true);
+        } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'M') {
+            event.preventDefault();
+            const order: OutputFormat[] = ['markdown','sentinel','xml','raw']; // UPDATED ORDER
+            const next = order[(order.indexOf(aggQuickFormat) + 1) % order.length];
+            handleQuickFormatChange(next);
+        } else if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === 'T') {
+            event.preventDefault();
+            handleQuickPrependChange(!aggQuickPrepend);
+        }
+    }, [treeData, selectedProjectId, isScanning, handleScanProject, aggQuickFormat, aggQuickPrepend, handleQuickFormatChange, handleQuickPrependChange]);
 
     useEffect(() => { window.addEventListener('keydown', handleGlobalKeyDown); return () => window.removeEventListener('keydown', handleGlobalKeyDown); }, [handleGlobalKeyDown]);
     const treeStats = useMemo(() => calculateTreeStats(treeData), [treeData]);
@@ -706,14 +745,21 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
         }
     };
     const handleClearSearch = () => {
-  cancelSearchClearTimer();
-  setSearchTerm("");
-  fileTreeRef.current?.clearSearchState();
-  searchInputRef.current?.focus();
-};
+      cancelSearchClearTimer();
+      setSearchTerm("");
+      fileTreeRef.current?.clearSearchState();
+      searchInputRef.current?.focus();
+    };
 
     const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
     const searchInputTitle = "Search files. Ctrl+F to focus. In search: ↓/↑ to navigate results, Enter to toggle selection, Esc to clear & unfocus.";
+
+    // Combine class names for the left panel
+    const leftPanelClasses = [
+        'left-panel',
+        isLeftPanelCollapsed ? 'collapsed' : '',
+        isAnimatingSidebar ? 'animating' : '',
+    ].filter(Boolean).join(' ');
 
     return (
         <div className="app-container">
@@ -734,7 +780,6 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
             )}
             {isScanning && (
                 <div className="scan-overlay">
-                    {/* ... (scan overlay content) ... */}
                     <div className="scan-indicator">
                         <h3>Scanning Project...</h3>
                         <progress value={scanProgressPct} max="100"></progress>
@@ -746,7 +791,7 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
             )}
 
             <div className="main-layout">
-                <div className={`left-panel ${isLeftPanelCollapsed ? 'collapsed' : ''}`}>
+                <div className={leftPanelClasses} style={{ width: `${leftPanelWidth}px` }}>
                     <div className="left-panel-project-manager">
                         {isLoading && <p>Loading Projects...</p>}
                         {error && <p style={{ color: 'red' }}>Error: {error}</p>}
@@ -766,14 +811,15 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
                     </div>
                 </div>
 
+                <div className="resize-handle" onMouseDown={handleResizeMouseDown}></div>
+
                 <div className="file-tree-main-content">
                      <div className="file-tree-header">
-                        <button className="collapse-toggle-btn" onClick={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)} title={isLeftPanelCollapsed ? "Show Left Panel" : "Hide Left Panel"}>
+                        <button className="collapse-toggle-btn" onClick={handleTogglePanel} title={isLeftPanelCollapsed ? "Show Left Panel" : "Hide Left Panel"}>
                             {isLeftPanelCollapsed ? '▶' : '◀'}
                         </button>
                         <h3>Project Files {isScanning && <span className="header-scanning-indicator">(Scanning...)</span>}</h3>
                         
-          {/* NEW: Quick Aggregator controls when sidebar collapsed */}
           {isLeftPanelCollapsed && (
             <div className="agg-quick-controls" title="Aggregator options (also in sidebar)">
               <label style={{ marginRight: '0.5em' }}>
@@ -784,6 +830,8 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
                   style={{ marginLeft: '0.4em' }}
                 >
                   <option value="markdown">Markdown</option>
+                  {/* --- UPDATED: Add Sentinel and re-order --- */}
+                  <option value="sentinel">Sentinel</option>
                   <option value="xml">XML</option>
                   <option value="raw">Raw</option>
                 </select>
@@ -801,23 +849,17 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
           )}
                         <div className="file-tree-search-controls">
                             <input 
-    ref={searchInputRef} 
-    type="text" 
-    placeholder="Search (Ctrl+F)..." 
-    value={searchTerm} 
-    onChange={(e) => setSearchTerm(e.target.value)} 
-    onKeyDown={handleSearchInputKeyDown}
-    onFocus={handleSearchInputFocus}
-    onBlur={handleSearchInputBlur}
-    title={searchInputTitle}
-/>
-
+                                ref={searchInputRef} type="text" placeholder="Search (Ctrl+F)..." value={searchTerm} 
+                                onChange={(e) => setSearchTerm(e.target.value)} 
+                                onKeyDown={handleSearchInputKeyDown}
+                                onFocus={handleSearchInputFocus}
+                                onBlur={handleSearchInputBlur}
+                                title={searchInputTitle}
+                            />
                             <button onClick={(e) => fileTreeRef.current?.expandTreeLevel(e.ctrlKey || e.metaKey)} title="Expand Level (Ctrl+Click for All)">▼</button>
                             <button onClick={(e) => fileTreeRef.current?.collapseTreeLevel(e.ctrlKey || e.metaKey)} title="Collapse Level (Ctrl+Click for All)">▲</button>
                             {searchTerm && (<button onClick={handleClearSearch} title="Clear Search (Esc)">✕</button>)}
                         </div>
-                       {/* Hotkeys button moved into Settings modal */}
-
                         <button onClick={handleOpenSettingsModal} title="Application Settings" className="settings-btn">⚙️</button>
                     </div>
                     <FileTree
@@ -838,11 +880,11 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
                 </div>
             </div>
             <StatusBar
-  stats={treeStats}
-  lastScanTime={selectedProject?.updated_at}
-  outOfDateFileCount={outOfDateFilePaths.size}
-  aggregated={{ ...aggregatedStats, tokens: effectiveAggTokens }}
-/>
+              stats={treeStats}
+              lastScanTime={selectedProject?.updated_at}
+              outOfDateFileCount={outOfDateFilePaths.size}
+              aggregated={{ ...aggregatedStats, tokens: effectiveAggTokens }}
+            />
         </div>
     );
 }

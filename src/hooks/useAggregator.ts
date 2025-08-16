@@ -1,322 +1,261 @@
-
 // src/hooks/useAggregator.ts
-
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { FileNode } from '../types/scanner';
+import { invoke } from '@tauri-apps/api/core';
 import {
+    escapeXml,
     formatFileContent,
     formatFolderHeader,
     formatFolderFooter,
-    generateFullScannedFileTree, 
+    generateFullScannedFileTree,
     getLanguageFromPath,
+    DEFAULT_FORMAT_INSTRUCTIONS,
+    FORMAT_INSTRUCTIONS_STORAGE_KEY_PREFIX,
 } from '../components/CodeContextBuilder/Aggregator/aggregatorUtils';
 
-export type OutputFormat = 'markdown' | 'xml' | 'raw';
-
-interface AggregatorSettings {
-    format: OutputFormat;
-    prependTree: boolean;
-}
+export type OutputFormat = 'markdown' | 'xml' | 'raw' | 'sentinel';
 
 interface UseAggregatorProps {
-  treeData: FileNode | null;
-  selectedPaths: Set<string>;
-  selectedProjectId: number | null;
-
-  // Corrected to match the props from Aggregator.tsx
-  compress?: boolean;
-  removeComments?: boolean;
+    treeData: FileNode | null;
+    selectedPaths: Set<string>;
+    selectedProjectId: number | null;
+    compress: boolean;
+    removeComments: boolean;
+    preambleTag: string;
+    queryTag: string;
 }
 
-// Type for the result of a single file read in the batch response
-type FileContentResult = string | { Ok: string } | { Err: string };
-// Type for the overall batch file contents response from Tauri
-type BatchFileContentsResponse = Record<string, FileContentResult>;
-
-
-interface UseAggregatorReturn {
-    aggregatedText: string;
-    tokenCount: number;
-    isLoading: boolean;
-    error: string | null;
-    selectedFormat: OutputFormat;
-    setSelectedFormat: (format: OutputFormat) => void;
-    prependFileTree: boolean;
-    setPrependFileTree: (prepend: boolean) => void;
-    handleCopyToClipboard: () => Promise<void>;
-    copySuccess: boolean;
-}
-
-const isDirRelevantForAggregation = (dirNode: FileNode, selectedPaths: Set<string>): boolean => {
-    if (!dirNode.is_dir) return false;
-    if (dirNode.children?.some(child => !child.is_dir && selectedPaths.has(child.path))) return true;
-    if (dirNode.children?.some(child => child.is_dir && isDirRelevantForAggregation(child, selectedPaths))) return true;
-    return false;
-};
-
-// Helper to get relative path
-function getRelativePath(fullPath: string, rootPath: string): string {
-    if (fullPath.startsWith(rootPath)) {
-        let relative = fullPath.substring(rootPath.length);
-        if (relative.startsWith('/') || relative.startsWith('\\')) {
-            relative = relative.substring(1);
-        }
-        return relative;
-    }
-    return fullPath;
-}
-
-const collectFilePathsForAggregation = (
-    node: FileNode | null,
-    selectedPaths: Set<string>,
-    pathsSet: Set<string>
-): void => {
-    if (!node) return;
-
-    if (!node.is_dir && selectedPaths.has(node.path)) {
-        pathsSet.add(node.path);
-    }
-
-    if (node.is_dir && node.children) {
-        if (isDirRelevantForAggregation(node, selectedPaths)) {
-            for (const child of node.children) {
-                collectFilePathsForAggregation(child, selectedPaths, pathsSet);
-            }
-        }
-    }
-};
-
-
-export function useAggregator({
-  treeData,
-  selectedPaths,
-  selectedProjectId,
-  compress, // Corrected prop name
-  removeComments,
-}: UseAggregatorProps): UseAggregatorReturn {
-    const isMountedRef = useRef(true);
+export const useAggregator = ({
+    treeData,
+    selectedPaths,
+    selectedProjectId,
+    compress,
+    removeComments,
+    preambleTag,
+    queryTag,
+}: UseAggregatorProps) => {
     const [aggregatedText, setAggregatedText] = useState<string>('');
     const [tokenCount, setTokenCount] = useState<number>(0);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [copySuccess, setCopySuccess] = useState<boolean>(false);
-    const [currentSelectedFormat, setCurrentSelectedFormat] = useState<OutputFormat>('markdown');
-    const [currentPrependFileTree, setCurrentPrependFileTree] = useState<boolean>(false);
+
+    // Persisted settings
+    const [selectedFormat, setSelectedFormat] = useState<OutputFormat>('markdown');
+    const [prependFileTree, setPrependFileTree] = useState<boolean>(false);
+    const [includeFormatInstructions, setIncludeFormatInstructions] = useState<boolean>(true); // NEW
+    
+    const [preamble, setPreamble] = useState<string>('');
+    const [query, setQuery] = useState<string>('');
+    const [debouncedPreamble, setDebouncedPreamble] = useState<string>(preamble);
+    const [debouncedQuery, setDebouncedQuery] = useState<string>(query);
 
     useEffect(() => {
-        isMountedRef.current = true;
-        return () => { isMountedRef.current = false; };
-    }, []);
+        const handler = setTimeout(() => {
+            setDebouncedPreamble(preamble);
+            setDebouncedQuery(query);
+        }, 250);
+        return () => clearTimeout(handler);
+    }, [preamble, query]);
+
 
     useEffect(() => {
-        if (selectedProjectId && selectedProjectId > 0) {
+        if (selectedProjectId) {
             try {
-                const storedSettingsRaw = localStorage.getItem(`ccb_agg_settings_${selectedProjectId}`);
-                if (storedSettingsRaw) {
-                    const settings: AggregatorSettings = JSON.parse(storedSettingsRaw);
-                    if (isMountedRef.current) {
-                        setCurrentSelectedFormat(settings.format && ['markdown', 'xml', 'raw'].includes(settings.format) ? settings.format : 'markdown');
-                        setCurrentPrependFileTree(typeof settings.prependTree === 'boolean' ? settings.prependTree : false);
+                const storedSettings = localStorage.getItem(`ccb_agg_settings_${selectedProjectId}`);
+                if (storedSettings) {
+                    const parsed = JSON.parse(storedSettings);
+                    if (['markdown', 'xml', 'raw', 'sentinel'].includes(parsed.format)) setSelectedFormat(parsed.format);
+                    if (typeof parsed.prependTree === 'boolean') setPrependFileTree(parsed.prependTree);
+                    // NEW: Load instruction toggle state, default to true if not found
+                    if (typeof parsed.includeFormatInstructions === 'boolean') {
+                        setIncludeFormatInstructions(parsed.includeFormatInstructions);
+                    } else {
+                        setIncludeFormatInstructions(true);
                     }
                 } else {
-                     if (isMountedRef.current) {
-                        setCurrentSelectedFormat('markdown');
-                        setCurrentPrependFileTree(false);
-                     }
+                    // Defaults for a new project
+                    setSelectedFormat('markdown');
+                    setPrependFileTree(false);
+                    setIncludeFormatInstructions(true);
                 }
+                const storedPreamble = localStorage.getItem(`ccb_agg_preamble_${selectedProjectId}`);
+                setPreamble(storedPreamble || '');
+                setDebouncedPreamble(storedPreamble || '');
+                const storedQuery = localStorage.getItem(`ccb_agg_query_${selectedProjectId}`);
+                setQuery(storedQuery || '');
+                setDebouncedQuery(storedQuery || '');
             } catch (e) {
-                if (isMountedRef.current) {
-                    setCurrentSelectedFormat('markdown');
-                    setCurrentPrependFileTree(false);
-                }
+                console.warn("Could not parse aggregator settings from localStorage:", e);
             }
         }
     }, [selectedProjectId]);
 
-    const handleSetSelectedFormat = useCallback((format: OutputFormat) => {
-        if (isMountedRef.current) setCurrentSelectedFormat(format);
-        if (selectedProjectId && selectedProjectId > 0) {
-            const newSettings: AggregatorSettings = { format, prependTree: currentPrependFileTree };
-            localStorage.setItem(`ccb_agg_settings_${selectedProjectId}`, JSON.stringify(newSettings));
-        }
-    }, [selectedProjectId, currentPrependFileTree]);
-
-    const handleSetPrependFileTree = useCallback((prepend: boolean) => {
-        if (isMountedRef.current) setCurrentPrependFileTree(prepend);
-        if (selectedProjectId && selectedProjectId > 0) {
-            const newSettings: AggregatorSettings = { format: currentSelectedFormat, prependTree: prepend };
-            localStorage.setItem(`ccb_agg_settings_${selectedProjectId}`, JSON.stringify(newSettings));
-        }
-    }, [selectedProjectId, currentSelectedFormat]);
-
-    const buildAggregatedContentRecursive = useCallback(async (
-        currentNode: FileNode,
-        currentMarkDownDepth: number,
-        formatToUse: OutputFormat,
-        projectRootPath: string,
-        fileContentsMap: BatchFileContentsResponse
-    ): Promise<string> => {
-        let builtContent = "";
-    
-        const relevantChildren = currentNode.children?.filter(child => {
-            if (!child.is_dir) return selectedPaths.has(child.path);
-            return isDirRelevantForAggregation(child, selectedPaths);
-        }) || [];
-    
-        relevantChildren.sort((a, b) => {
-            if (!a.is_dir && b.is_dir) return -1;
-            if (a.is_dir && !b.is_dir) return 1;
-            return a.name.localeCompare(b.name);
-        });
-    
-        for (const childNode of relevantChildren) {
-            const displayPath = getRelativePath(childNode.path, projectRootPath);
-            if (!childNode.is_dir) {
-                const lang = getLanguageFromPath(childNode.path);
-                const fileResult = fileContentsMap[childNode.path];
-                let fileContentText: string;
-
-                if (typeof fileResult === 'string') {
-                    fileContentText = fileResult;
-                } else if (fileResult && 'Ok' in fileResult) {
-                    fileContentText = fileResult.Ok;
-                } else {
-                    const errorMsg = fileResult && 'Err' in fileResult ? fileResult.Err : 'Content not found';
-                    fileContentText = `// Error reading file (${childNode.name}): ${errorMsg}`;
-                }
-                builtContent += formatFileContent(displayPath, childNode.name, fileContentText, formatToUse, currentMarkDownDepth, lang);
-            } else {
-                builtContent += formatFolderHeader(childNode.name, displayPath, formatToUse, currentMarkDownDepth);
-                builtContent += await buildAggregatedContentRecursive(childNode, currentMarkDownDepth + 1, formatToUse, projectRootPath, fileContentsMap);
-                builtContent += formatFolderFooter(formatToUse, currentMarkDownDepth);
-            }
-        }
-        return builtContent;
-    }, [selectedPaths]); 
-
-    const generateAggregatedText = useCallback(async () => {
-        if (isMountedRef.current) {
-            setIsLoading(true);
-            setError(null);
-            setCopySuccess(false);
-        }
-        
-        if (!treeData) {
-          if (isMountedRef.current) {
-            setAggregatedText('');
-            setTokenCount(0);
-            setIsLoading(false);
-          }
-          window.dispatchEvent(new CustomEvent('agg-token-count', { detail: { tokenCount: 0, projectId: selectedProjectId ?? undefined } }));
-          return;
-        }
-
-        const formatToUse = currentSelectedFormat;
-        const prependToUse = currentPrependFileTree;
-        const projectRootAbsolutePath = treeData.path; 
-        
-        let textForPrependedTree = prependToUse ? generateFullScannedFileTree(treeData, formatToUse) : '';
-        let aggregatedCoreContent = '';
-        let fileContentsMap: BatchFileContentsResponse = {};
-
-        const pathsToFetchSet = new Set<string>();
-        if (selectedPaths.size > 0) {
-             collectFilePathsForAggregation(treeData, selectedPaths, pathsToFetchSet);
-        }
-        const uniquePathsToFetch = Array.from(pathsToFetchSet);
-
-        if (uniquePathsToFetch.length > 0) {
+    const persistSettings = useCallback(() => {
+        if (selectedProjectId) {
             try {
-                // Correctly use the `compress` prop
-                if (compress) {
-                  fileContentsMap = await invoke<BatchFileContentsResponse>(
-                    "read_multiple_file_contents_compressed",
-                    { paths: uniquePathsToFetch, options: { remove_comments: !!removeComments } }
-                  );
-                } else {
-                  fileContentsMap = await invoke<BatchFileContentsResponse>("read_multiple_file_contents", { paths: uniquePathsToFetch });
-                }
-            } catch (batchError) {
-                const errMsg = batchError instanceof Error ? batchError.message : String(batchError);
-                if (isMountedRef.current) setError(`Failed to fetch file contents: ${errMsg}`);
-                uniquePathsToFetch.forEach(p => {
-                    fileContentsMap[p] = { Err: `Batch read command failed: ${errMsg}` };
+                const settings = JSON.stringify({ 
+                    format: selectedFormat, 
+                    prependTree: prependFileTree,
+                    includeFormatInstructions: includeFormatInstructions // NEW
                 });
+                localStorage.setItem(`ccb_agg_settings_${selectedProjectId}`, settings);
+                localStorage.setItem(`ccb_agg_preamble_${selectedProjectId}`, preamble);
+                localStorage.setItem(`ccb_agg_query_${selectedProjectId}`, query);
+            } catch (e) {
+                console.warn("Could not save aggregator settings to localStorage:", e);
             }
         }
-        
-        if (!isMountedRef.current) return;
+    }, [selectedFormat, prependFileTree, includeFormatInstructions, preamble, query, selectedProjectId]);
+    
+    useEffect(() => {
+        persistSettings();
+    }, [persistSettings]);
 
-        if (selectedPaths.size > 0) {
-            aggregatedCoreContent = await buildAggregatedContentRecursive(treeData, 1, formatToUse, projectRootAbsolutePath, fileContentsMap);
-        }
-        
-        let finalOutput = textForPrependedTree.length > 0 ? `${textForPrependedTree}\n\n${aggregatedCoreContent}` : aggregatedCoreContent;
-        
-        if (formatToUse === 'markdown' && finalOutput.endsWith('---\n\n')) {
-            finalOutput = finalOutput.slice(0, -5);
-        }
-        
-        if (isMountedRef.current) setAggregatedText(finalOutput);
 
-        if (finalOutput) {
-            try {
-                const computedCount = await invoke<number>("get_text_token_count", { text: finalOutput });
-                if (isMountedRef.current) setTokenCount(computedCount);
-                window.dispatchEvent(new CustomEvent('agg-token-count', { detail: { tokenCount: computedCount, projectId: selectedProjectId ?? undefined } }));
-            } catch (tokenError) {
-                 if (isMountedRef.current) {
-                    setTokenCount(0);
-                    setError(prev => (prev ? prev + "\n" : "") + `Token count failed.`);
-                 }
+    const aggregateContent = useCallback(async () => {
+        // ... (this function's logic remains exactly the same) ...
+        if (!treeData || selectedPaths.size === 0) {
+            setAggregatedText('');
+            return;
+        }
+        setIsLoading(true);
+        setError(null);
+        setAggregatedText('');
+        const pathsToRead = Array.from(selectedPaths);
+        const fileIdMap = new Map<string, string>();
+        pathsToRead.forEach((path, index) => fileIdMap.set(path, `f${index + 1}`));
+        try {
+            const fileContentsMap: Record<string, string> = {};
+            if (compress) {
+                const compressedResults = await invoke<Record<string, { Ok?: string; Err?: string }>>("read_multiple_file_contents_compressed", { paths: pathsToRead, options: { removeComments: removeComments } });
+                for (const path in compressedResults) {
+                    const result = compressedResults[path];
+                    if (result.Ok) { fileContentsMap[path] = result.Ok; } else if (result.Err) { fileContentsMap[path] = `Error reading file: ${result.Err}`; }
+                }
+            } else {
+                const results = await invoke<Record<string, { Ok?: string; Err?: string }>>("read_multiple_file_contents", { paths: pathsToRead });
+                for (const path in results) {
+                    const result = results[path];
+                    if (result.Ok) { fileContentsMap[path] = result.Ok; } else if (result.Err) { fileContentsMap[path] = `Error reading file: ${result.Err}`; }
+                }
             }
-        } else {
-          if (isMountedRef.current) setTokenCount(0);
-          window.dispatchEvent(new CustomEvent('agg-token-count', { detail: { tokenCount: 0, projectId: selectedProjectId ?? undefined } }));
+            let contentBody = '';
+            if (prependFileTree) {
+                contentBody += generateFullScannedFileTree(treeData, selectedFormat) + '\n\n';
+            }
+            
+            const buildOutputRecursive = (node: FileNode, depth: number): string => {
+                if (!node.is_dir) {
+                    if (selectedPaths.has(node.path)) {
+                        const content = fileContentsMap[node.path] || `// Content for ${node.path} not found.`;
+                        const lang = getLanguageFromPath(node.path);
+                        const fileId = fileIdMap.get(node.path) || 'unknown';
+                        return formatFileContent(node.path, node.name, content, selectedFormat, depth, lang, fileId);
+                    }
+                    return '';
+                }
+
+                let childrenContent = '';
+                if (node.children) {
+                    childrenContent = node.children.map(child => buildOutputRecursive(child, depth + 1)).join('');
+                }
+
+                if (childrenContent.trim().length > 0) {
+                    return `${formatFolderHeader(node.name, node.path, selectedFormat, depth)}${childrenContent}${formatFolderFooter(selectedFormat, depth)}`;
+                }
+                return '';
+            };
+
+            contentBody += buildOutputRecursive(treeData, 0);
+            setAggregatedText(contentBody);
+
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            setError(`Failed to aggregate content: ${errorMsg}`);
+            setAggregatedText('');
+        } finally {
+            setIsLoading(false);
         }
-
-        if (isMountedRef.current) setIsLoading(false);
-    }, [
-      treeData,
-      selectedPaths,
-      currentSelectedFormat,
-      currentPrependFileTree,
-      buildAggregatedContentRecursive,
-      compress, // Corrected dependency
-      removeComments,
-      selectedProjectId
-    ]);
-
+    }, [treeData, selectedPaths, selectedFormat, prependFileTree, compress, removeComments]);
 
     useEffect(() => {
-        generateAggregatedText().catch(err => {
-            if(isMountedRef.current) setError(`Aggregation failed: ${err instanceof Error ? err.message : String(err)}`);
-        });
-    }, [generateAggregatedText]);
+        aggregateContent();
+    }, [aggregateContent]);
 
-    const handleCopyToClipboard = useCallback(async () => {
-        if (!aggregatedText || isLoading) return;
-        try {
-            await navigator.clipboard.writeText(aggregatedText);
-            if (isMountedRef.current) setCopySuccess(true);
-            window.dispatchEvent(new CustomEvent('global-copy-success'));
-            setTimeout(() => { if (isMountedRef.current) setCopySuccess(false); }, 1500);
-        } catch (err) {
-            if (isMountedRef.current) setError(`Failed to copy.`);
+    const finalPromptPreview = useMemo(() => {
+        const hasContext = aggregatedText.trim().length > 0;
+        const userPreamble = debouncedPreamble.trim();
+        const userQuery = debouncedQuery.trim();
+
+        let treeDescription = '';
+        if (prependFileTree) {
+            treeDescription = "First, you will be provided with a file tree showing the project structure.";
         }
-    }, [aggregatedText, isLoading]);
+        
+        // --- MODIFIED: Dynamically load format instructions ---
+        let formatDescription = '';
+        if (hasContext && includeFormatInstructions) {
+            const followStr = prependFileTree ? 'Following the tree, you will receive' : 'You will receive';
+            const fileStr = selectedPaths.size === 1 ? '1 file' : `${selectedPaths.size} files`;
+            const baseInstruction = localStorage.getItem(`${FORMAT_INSTRUCTIONS_STORAGE_KEY_PREFIX}${selectedFormat}`) ?? DEFAULT_FORMAT_INSTRUCTIONS[selectedFormat];
+            // Replace placeholder for dynamic file count
+            formatDescription = `${followStr} ${fileStr} formatted as follows: ${baseInstruction}`;
+        }
+
+        const effectivePreamble = [treeDescription, formatDescription, userPreamble].filter(Boolean).join('\n\n');
+        const hasEffectivePreamble = effectivePreamble.length > 0;
+        const hasQuery = userQuery.length > 0;
+
+        if (!hasEffectivePreamble && !hasContext && !hasQuery) return '';
+
+        const finalPreambleTag = preambleTag.trim() || 'preamble';
+        const finalQueryTag = queryTag.trim() || 'query';
+
+        if (selectedFormat === 'xml') {
+            const parts = ['<?xml version="1.0" encoding="UTF-8"?>\n<prompt>'];
+            if (hasEffectivePreamble) parts.push(`  <${finalPreambleTag}>${escapeXml(effectivePreamble)}</${finalPreambleTag}>`);
+            if (hasContext) parts.push(`  <context>\n${aggregatedText.trim()}\n  </context>`);
+            if (hasQuery) parts.push(`  <${finalQueryTag}>${escapeXml(userQuery)}</${finalQueryTag}>`);
+            parts.push('</prompt>');
+            return parts.join('\n');
+        } else {
+            const parts = [];
+            if (hasEffectivePreamble) parts.push(`<${finalPreambleTag}>\n${effectivePreamble}\n</${finalPreambleTag}>`);
+            if (hasContext) parts.push(`<context>\n${aggregatedText.trim()}\n</context>`);
+            if (hasQuery) parts.push(`<${finalQueryTag}>\n${userQuery}\n</${finalQueryTag}>`);
+            return parts.join('\n\n');
+        }
+    }, [debouncedPreamble, debouncedQuery, aggregatedText, selectedFormat, selectedPaths.size, prependFileTree, preambleTag, queryTag, includeFormatInstructions]);
+
+    useEffect(() => {
+        const calculateTokens = async () => {
+            if (!finalPromptPreview) { setTokenCount(0); return; }
+            try {
+                const count = await invoke<number>('get_text_token_count', { text: finalPromptPreview });
+                setTokenCount(count);
+                window.dispatchEvent(new CustomEvent('agg-token-count', { detail: { tokenCount: count, projectId: selectedProjectId }}));
+            } catch (err) {
+                console.warn("Token count failed:", err);
+                setTokenCount(0);
+            }
+        };
+        calculateTokens();
+    }, [finalPromptPreview, selectedProjectId]);
+
+    const handleCopyToClipboard = useCallback(() => {
+        if (!finalPromptPreview) return;
+        navigator.clipboard.writeText(finalPromptPreview).then(() => {
+            setCopySuccess(true);
+            window.dispatchEvent(new CustomEvent('global-copy-success'));
+            setTimeout(() => setCopySuccess(false), 2000);
+        }).catch(() => setError('Failed to copy to clipboard.'));
+    }, [finalPromptPreview]);
 
     return {
-        aggregatedText,
-        tokenCount,
-        isLoading,
-        error,
-        selectedFormat: currentSelectedFormat,
-        setSelectedFormat: handleSetSelectedFormat,
-        prependFileTree: currentPrependFileTree,
-        setPrependFileTree: handleSetPrependFileTree,
-        handleCopyToClipboard,
-        copySuccess,
+        finalPromptPreview, tokenCount, isLoading, error, selectedFormat, setSelectedFormat,
+        prependFileTree, setPrependFileTree, handleCopyToClipboard, copySuccess,
+        preamble, setPreamble, query, setQuery,
+        includeFormatInstructions, setIncludeFormatInstructions, // NEWLY EXPORTED
     };
-}
+};
