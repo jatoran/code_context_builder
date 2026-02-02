@@ -63,7 +63,7 @@ const Aggregator: React.FC<AggregatorProps> = ({ selectedPaths, treeData, select
         try {
             const storedPresets = localStorage.getItem(PRESETS_STORAGE_KEY);
             if (storedPresets) setPresets(JSON.parse(storedPresets));
-        } catch (e) { console.error("Failed to load presets:", e); }
+        } catch (e) { }
     }, []);
 
     useEffect(() => {

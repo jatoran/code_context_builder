@@ -33,13 +33,11 @@ const FileViewerModal: React.FC<FileViewerModalProps> = ({ filePath, onClose }) 
                 setContent('');
             }
             try {
-                console.log("Modal invoking read_file_contents for:", filePath);
                 const fileContent = await invoke<string>("read_file_contents", { filePath });
                 if (isMountedRef.current) {
                     setContent(fileContent);
                 }
             } catch (err) {
-                console.error(`Failed to read file content for ${filePath}:`, err);
                 const errorMsg = err instanceof Error ? err.message : String(err);
                 if (isMountedRef.current) {
                     setError(`Failed to load file: ${errorMsg}`);

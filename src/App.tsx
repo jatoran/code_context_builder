@@ -255,7 +255,6 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
                     setCurrentTheme((storedTheme as ThemeSetting) || 'system');
                 }
             } catch (err) {
-                console.error("Failed to load theme setting:", err);
                 if (isMountedRef.current) setCurrentTheme('system');
             }
         };
@@ -327,7 +326,6 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
             try {
                 const mainWin = await Window.getByLabel('main');
                  if (!localIsMountedRef.current || !mainWin) {
-                    if (!mainWin) console.error("Main window not found for geometry restoration.");
                     return;
                 }
                 mainWindowRef.current = mainWin;
@@ -341,11 +339,11 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
                         await mainWin.setSize(new PhysicalSize(savedGeometry.width, savedGeometry.height));
                     }
                 }
-            } catch (err) { console.error('Failed to restore window geometry:', err); }
+            } catch (err) { }
             finally {
                 if (localIsMountedRef.current && mainWindowRef.current) {
                     try { await mainWindowRef.current.show(); await mainWindowRef.current.setFocus(); }
-                    catch (showFocusErr) { console.error('Error showing/focusing window during restore:', showFocusErr); }
+                    catch (showFocusErr) { }
                 }
             }
         };
@@ -360,7 +358,7 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
                     const geometry: WindowGeometry = { x: position.x, y: position.y, width: size.width, height: size.height };
                     localStorage.setItem(WINDOW_GEOMETRY_KEY, JSON.stringify(geometry));
                 }
-            } catch (error) { console.error('Failed to save window geometry:', error); }
+            } catch (error) { }
         };
         const debouncedSaveGeometry = debounce(saveCurrentWindowGeometry, 500);
         const setupListeners = async () => {
@@ -372,7 +370,7 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
                 unlistenMove = await mainWin.onMoved(debouncedSaveGeometry);
             }
         };
-        setupListeners().catch(err => console.error("Error in window geometry setupListeners:", err));
+        setupListeners();
         return () => { localIsMountedRef.current = false; unlistenResize?.(); unlistenMove?.(); };
     }, []);
 
@@ -420,7 +418,7 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
             try {
                 await invoke("stop_monitoring_project_cmd");
                 if (isMountedRef.current) { setIsMonitoringProject(null); setOutOfDateFilePaths(new Set());}
-            } catch (err) { /* console.error(...) */ }
+            } catch (err) { }
         }
     }, [isMonitoringProject]);
     const startFileMonitoring = useCallback(async (projectId: number, currentTreeData: FileNode | null) => {
@@ -450,9 +448,9 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
                 unlistenFreshness = await listen<string[]>("file-freshness-update", (event) => {
                     if (localIsMountedRef.current && isMountedRef.current) setOutOfDateFilePaths(new Set(event.payload));
                 });
-            } catch (err) { /* console.error(...) */ }
+            } catch (err) { }
         };
-        setupFreshnessListener().catch(err => console.error("Error setting up freshness listener:", err));
+        setupFreshnessListener();
         return () => { localIsMountedRef.current = false; unlistenFreshness?.(); };
     }, []);
 
@@ -472,7 +470,6 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
             else if (loadedProjects.length > 0) projectToSelect = loadedProjects[0].id;
             setSelectedProjectId(projectToSelect);
         } catch (err) {
-            console.error("[APP] Failed to load projects:", err);
             if (isMountedRef.current) {
                 setError(`Failed to load projects: ${err instanceof Error ? err.message : String(err)}`);
                 setProjects([]); setSelectedProjectId(0);
@@ -483,9 +480,7 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
 
     useEffect(() => {
         const localIsMountedRef = { current: true };
-        loadProjects(undefined).catch(loadErr => {
-            if(localIsMountedRef.current && isMountedRef.current) console.error("Error during initial project load:", loadErr);
-        });
+        loadProjects(undefined);
         return () => { localIsMountedRef.current = false; };
     }, [loadProjects]);
 
@@ -500,8 +495,8 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
                 const storedTreeJson = localStorage.getItem(`ccb_treeData_${selectedProjectId}`);
                 let loadedTree: FileNode | null = null;
                 if (storedTreeJson) {
-                    try { loadedTree = JSON.parse(storedTreeJson); } 
-                    catch (e) { console.warn(`[APP MainEffect] Failed to parse stored tree data for project ${selectedProjectId}:`, e); localStorage.removeItem(`ccb_treeData_${selectedProjectId}`); }
+                    try { loadedTree = JSON.parse(storedTreeJson); }
+                    catch (e) { localStorage.removeItem(`ccb_treeData_${selectedProjectId}`); }
                 }
                 setTreeData(loadedTree);
                 const storedSelected = localStorage.getItem(`ccb_selectedPaths_${selectedProjectId}`);
@@ -537,9 +532,9 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
                         if (status === 'done') setOutOfDateFilePaths(new Set());
                     }
                 });
-            } catch (err) { if(localIsMountedRef.current && isMountedRef.current) { console.error("[APP] Failed to set up scan listeners:", err); setError(`Listener setup failed: ${err instanceof Error ? err.message : String(err)}`); } }
+            } catch (err) { if(localIsMountedRef.current && isMountedRef.current) { setError(`Listener setup failed: ${err instanceof Error ? err.message : String(err)}`); } }
         };
-        setupListeners().catch(err => console.error("Error setting up scan listeners:", err));
+        setupListeners();
         return () => { localIsMountedRef.current = false; unlistenProgress?.(); unlistenComplete?.(); };
     }, []);
 
@@ -609,8 +604,7 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
             if (isMountedRef.current) {
                  await loadProjects();
             }
-        } catch (err) { 
-            console.error("Error during delete process:", err);
+        } catch (err) {
             if (isMountedRef.current) {
                 setError(`Delete process failed: ${err instanceof Error ? err.message : String(err)}`);
             }
@@ -630,7 +624,6 @@ const effectiveAggTokens = aggTokenCount || aggregatedStats.tokens;
            setTreeData(result); localStorage.setItem(`ccb_treeData_${selectedProjectId}`, JSON.stringify(result));
            setProjects(prev => prev.map(p => p.id === selectedProjectId ? {...p, updated_at: new Date().toISOString()} : p));
         } catch (err) {
-            console.error("[APP] Scan invocation failed:", err);
             if (!isMountedRef.current) return;
             setError(`Scan failed: ${err instanceof Error ? err.message : String(err)}`);
             setTreeData(null); localStorage.removeItem(`ccb_treeData_${selectedProjectId}`);

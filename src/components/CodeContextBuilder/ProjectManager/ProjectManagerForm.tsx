@@ -34,7 +34,6 @@ const ProjectManagerForm: React.FC<ProjectManagerFormProps> = ({
            setRootFolder(selected);
        }
      } catch (error) {
-        console.error("Error picking folder:", error);
         alert(`Could not open folder picker: ${error instanceof Error ? error.message : String(error)}`);
      }
   }, [rootFolder, setRootFolder]);

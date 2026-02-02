@@ -24,7 +24,6 @@ function getDurationSince(dateString: string | null | undefined): string {
     try {
       const date = new Date(dateString);
        if (isNaN(date.getTime())) {
-            console.warn("Invalid date string received for status bar:", dateString);
             return 'Invalid Date';
         }
       const now = new Date();
@@ -38,7 +37,6 @@ function getDurationSince(dateString: string | null | undefined): string {
       const days = Math.floor(hours / 24);
       return `${days}d ago`;
     } catch (e) {
-        console.error("Error formatting duration:", dateString, e);
         return 'Error';
     }
 }

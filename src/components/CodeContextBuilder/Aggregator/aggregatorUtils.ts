@@ -260,7 +260,6 @@ export function generateFormattedFileTree(
 ): string {
     // This function can be considered deprecated in favor of generateFullScannedFileTree,
     // as providing the full tree is generally more useful context for an LLM.
-    console.warn("generateFormattedFileTree is deprecated. Consider using generateFullScannedFileTree.");
     if (!rootNode || selectedPaths.size === 0) return "";
     // For now, it can simply call the full tree generator as a fallback.
     return generateFullScannedFileTree(rootNode, format);

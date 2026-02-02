@@ -1,8 +1,26 @@
 {
   "name": "code-context-builder",
-  "private": true,
+  "private": false,
   "version": "0.1.0",
   "type": "module",
+  "description": "A powerful desktop app for creating LLM-optimized prompts from your codebase",
+  "author": "jatoran",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jatoran/code_context_builder.git"
+  },
+  "homepage": "https://github.com/jatoran/code_context_builder",
+  "keywords": [
+    "llm",
+    "ai",
+    "prompt-engineering",
+    "code-analysis",
+    "tauri",
+    "context-builder",
+    "chatgpt",
+    "claude"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

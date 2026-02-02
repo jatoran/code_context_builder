@@ -86,7 +86,6 @@ export const useAggregator = ({
                 setQuery(storedQuery || '');
                 setDebouncedQuery(storedQuery || '');
             } catch (e) {
-                console.warn("Could not parse aggregator settings from localStorage:", e);
             }
         }
     }, [selectedProjectId]);
@@ -103,7 +102,6 @@ export const useAggregator = ({
                 localStorage.setItem(`ccb_agg_preamble_${selectedProjectId}`, preamble);
                 localStorage.setItem(`ccb_agg_query_${selectedProjectId}`, query);
             } catch (e) {
-                console.warn("Could not save aggregator settings to localStorage:", e);
             }
         }
     }, [selectedFormat, prependFileTree, includeFormatInstructions, preamble, query, selectedProjectId]);
@@ -236,7 +234,6 @@ export const useAggregator = ({
                 setTokenCount(count);
                 window.dispatchEvent(new CustomEvent('agg-token-count', { detail: { tokenCount: count, projectId: selectedProjectId }}));
             } catch (err) {
-                console.warn("Token count failed:", err);
                 setTokenCount(0);
             }
         };

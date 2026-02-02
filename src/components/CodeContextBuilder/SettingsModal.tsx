@@ -82,7 +82,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             setInstructionTexts(loadedInstructions);
 
         } catch (err) {
-            console.error("Failed to load settings:", err);
             setError(err instanceof Error ? err.message : String(err));
         } finally {
             setDefaultIgnorePatterns(loadedPatterns);
@@ -126,7 +125,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             setInstructionsSaveStatus('saved');
             setTimeout(() => setInstructionsSaveStatus('idle'), 2000);
         } catch (e) {
-            console.error("Failed to save format instructions:", e);
             setInstructionsSaveStatus('error');
         }
     };
@@ -172,7 +170,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             try {
                 const dir = await downloadDir();
                 defaultExportPath = `${dir}ccb_projects_export.json`;
-            } catch (e) { console.warn("Could not get downloads directory", e); }
+            } catch (e) { }
             
             const filePath = await saveDialog({ defaultPath: defaultExportPath, filters: [{ name: 'JSON', extensions: ['json'] }], title: 'Export Projects' });
             if (filePath) {
