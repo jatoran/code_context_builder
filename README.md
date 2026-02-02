@@ -4,6 +4,22 @@ A powerful, keyboard-driven desktop application for creating high-quality, LLM-o
 
 ![Code Context Builder](.github/images/screenshot-compact.png)
 
+## Download
+
+### Pre-built Binaries (Recommended)
+
+Download the latest release for your platform:
+
+- **Windows:** Download `.exe` from [latest release](https://github.com/jatoran/code_context_builder/releases/latest)
+- **Linux:** Download `.deb` or `.AppImage` from [latest release](https://github.com/jatoran/code_context_builder/releases/latest)
+- **macOS:** Download `.dmg` from [latest release](https://github.com/jatoran/code_context_builder/releases/latest)
+
+All platforms are built automatically via GitHub Actions.
+
+### Build from Source
+
+See [Installation](#installation) section below for build instructions.
+
 ## Why I Built This
 
 Because manually copying code into LLMs is tedious, and with expensive pro models, **every token counts**.
