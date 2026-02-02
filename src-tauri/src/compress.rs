@@ -1,6 +1,6 @@
 // src-tauri/src/compress.rs
 use rayon::prelude::*; // Import Rayon for parallel processing
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;

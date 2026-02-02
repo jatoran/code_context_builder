@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "code-context-builder",
-  "version": "0.1.0",
-  "identifier": "ccb",
+  "productName": "Code Context Builder",
+  "version": "1.0.0",
+  "identifier": "com.jatoran.codecontextbuilder",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -27,10 +27,14 @@
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
     "targets": "all",
     "icon": [
       "icons/ccb-icon.ico"
-    ]
+    ],
+    "publisher": "jatoran",
+    "homepage": "https://github.com/jatoran/code_context_builder",
+    "longDescription": "A powerful, keyboard-driven desktop application for creating high-quality, LLM-optimized prompts from your codebase.",
+    "shortDescription": "Create LLM-optimized prompts from your codebase"
   }
 }

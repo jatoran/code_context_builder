@@ -1,7 +1,7 @@
 {
   "name": "code-context-builder",
   "private": false,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "A powerful desktop app for creating LLM-optimized prompts from your codebase",
   "author": "jatoran",
