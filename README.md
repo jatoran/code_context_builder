@@ -4,6 +4,12 @@ A powerful, keyboard-driven desktop application for creating high-quality, LLM-o
 
 ![Code Context Builder](.github/images/screenshot-compact.png)
 
+## Why I Built This
+
+Because manually copying code into LLMs is tedious, and with expensive pro models, **every token counts**.
+
+This tool helps you curate precise context, track token usage, and work at keyboard speed when you need to feed your code to any chat interface.
+
 ## Features
 
 - **Smart Project Scanning**: Efficiently scans project folders with customizable ignore patterns

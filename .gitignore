@@ -58,3 +58,6 @@ coverage
 
 # Claude Code CLI
 .claude/
+
+# VS Code workspace files (personal preference)
+*.code-workspace
